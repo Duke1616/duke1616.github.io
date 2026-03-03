@@ -35,7 +35,7 @@ jobs:
           node-version: 22.18.0
           cache: pnpm # 设置缓存
       - name: Setup Pages
-        uses: actions/configure-pages@v4  # 在工作流程自动配置GithubPages
+        uses: actions/configure-pages@v4
       - name: Install dependencies
         run: pnpm install # 安装依赖
       - name: Build with VitePress
