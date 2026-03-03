@@ -39,9 +39,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install # 安装依赖
       - name: Build with VitePress
-        run: |
-          pnpm run docs:build # 启动项目
-          touch docs/.vitepress/dist/.nojekyll
+        run: pnpm run docs:build # 启动项目
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3  # 上传构建产物
         with:
