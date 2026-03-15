@@ -28,23 +28,30 @@ export default withMermaid(defineConfig({
         ]
       },
       {
-        text: '工单系统',
+        text: '工单模块',
         items: [
-          { text: '概念总览', link: '/workflow/concept' },
+          { text: '设计思想', link: '/workflow/concept' },
           {
             text: '节点库',
             collapsed: true,
             items: [
               { text: '节点总览', link: '/workflow/node/overview' },
               { text: '开始节点', link: '/workflow/node/start' },
-              { text: '审批节点', link: '/workflow/node/approval' },
-              { text: '执行节点', link: '/workflow/node/task' },
-              { text: '条件节点', link: '/workflow/node/condition' },
-              { text: '抄送节点', link: '/workflow/node/notify' },
+              { text: '用户节点', link: '/workflow/node/user' },
+              { text: '自动化节点', link: '/workflow/node/automation' },
+              { text: '网关节点', link: '/workflow/node/gateway' },
+              { text: '群通知节点', link: '/workflow/node/chat' },
               { text: '结束节点', link: '/workflow/node/end' }
             ]
           },
-          { text: '使用案例', link: '/workflow/cases' }
+          {
+            text: '使用案例',
+            collapsed: true,
+            items: [
+              { text: '应用发布', link: '/workflow/cases/deploy' },
+              { text: '权限申请', link: '/workflow/cases/permission' }
+            ]
+          }
         ]
       }
     ],

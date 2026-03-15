@@ -39,3 +39,9 @@ html.dark .VPHero .image {
     /* 黑色模式下的图标阴影反转并添加高级辉光效果 */
     filter: drop-shadow(0 10px 30px rgba(83, 148, 244, 0.2)) drop-shadow(0 0 100px rgba(114, 206, 207, 0.3));
 }
+
+/* 让文档中的表格自动铺满宽度 */
+.vp-doc table {
+    display: table;
+    width: 100%;
+}
