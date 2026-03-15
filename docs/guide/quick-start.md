@@ -9,16 +9,18 @@
 - **演示账户**：demo
 - **演示密码**：123456
 
-> 💡 **提示**：演示环境拥有平台的读取权限，如需可写权限请主动联系，下方有联系方式
+> 💡 **提示**：为了安全性考虑，演示环境拥有平台的读取权限
 
 ## 💻 系统要求
-- Go 1.21+
-- Docker & Docker Compose
-- MongoDB 4.4+
-- MySQL 8.0+
-- Redis 6.0+
 
-## 🚀 一键部署
+为了保障系统的完整功能运行，建议准备以下环境：
+
+- **基础环境**：Go 1.25+ | Node.js 20+
+- **容器编排**：Docker & Docker Compose
+- **核心数据**：Percona MongoDB 7.0+ (需支持 ngram) | MySQL 8.0+
+- **中间件**：Redis Stack 7.2+ | Kafka | Etcd (用于分布式调度)
+
+## 🚀 快速部署
 
 1. 创建网络
 ```bash
@@ -40,9 +42,6 @@ docker exec -it ecmdb ./ecmdb init
 go run main.go init ticket-notify-template
 ```
 
-## 🔑 默认账户
-- **用户名**：admin
-- **密码**：123456
 
 ## 📚 本地开发指南
 
@@ -60,3 +59,9 @@ go run main.go start
 ```bash
 go run main.go init
 ```
+
+## 💬 联系我们
+
+如果您在使用过程中遇到任何问题，或需要开通演示环境的可写权限，欢迎交流联系：
+![WeChat QR](/wechat-qr.jpg)
+
