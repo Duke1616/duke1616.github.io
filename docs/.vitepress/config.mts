@@ -31,6 +31,14 @@ export default withMermaid(defineConfig({
         text: '工单模块',
         items: [
           { text: '设计思想', link: '/workflow/concept' },
+          {
+            text: '工单中心',
+            collapsed: false,
+            items: [
+              { text: '提交工单', link: '/workflow/ticket-start' },
+              { text: '工单列表', link: '/workflow/ticket' },
+            ]
+          },
           { text: '模版管理', link: '/workflow/management/template' },
           {
             text: '流程管理',
