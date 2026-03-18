@@ -61,6 +61,13 @@ export default withMermaid(defineConfig({
             ]
           }
         ]
+      },
+      {
+        text: '任务中心',
+        items: [
+          { text: '任务模版', link: '/task/template' },
+          { text: '执行节点', link: '/task/execution' }
+        ]
       }
     ],
 
