@@ -31,21 +31,29 @@ export default withMermaid(defineConfig({
         text: '工单模块',
         items: [
           { text: '设计思想', link: '/workflow/concept' },
+          { text: '模版管理', link: '/workflow/management/template' },
           {
-            text: '节点库',
-            collapsed: true,
+            text: '流程管理',
+            collapsed: false,
             items: [
-              { text: '节点总览', link: '/workflow/node/overview' },
-              { text: '开始节点', link: '/workflow/node/start' },
-              { text: '用户节点', link: '/workflow/node/user' },
-              { text: '自动化节点', link: '/workflow/node/automation' },
-              { text: '网关节点', link: '/workflow/node/gateway' },
-              { text: '群通知节点', link: '/workflow/node/chat' },
-              { text: '结束节点', link: '/workflow/node/end' }
+              { text: '编排说明', link: '/workflow/management/workflow' },
+              {
+                text: '节点库',
+                collapsed: true,
+                items: [
+                  { text: '节点总览', link: '/workflow/node/overview' },
+                  { text: '开始节点', link: '/workflow/node/start' },
+                  { text: '用户节点', link: '/workflow/node/user' },
+                  { text: '自动化节点', link: '/workflow/node/automation' },
+                  { text: '网关节点', link: '/workflow/node/gateway' },
+                  { text: '群通知节点', link: '/workflow/node/chat' },
+                  { text: '结束节点', link: '/workflow/node/end' }
+                ]
+              }
             ]
           },
           {
-            text: '使用案例',
+            text: '使用示例',
             collapsed: true,
             items: [
               { text: '应用发布', link: '/workflow/cases/deploy' },
