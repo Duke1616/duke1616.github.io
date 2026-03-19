@@ -4,7 +4,7 @@
 
 ## 1. 可视化设计器
 
-<img src="/images/manager/workflow.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="流程设计器预览" />
+<img src="/images/workflow/workflow.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="流程设计器预览" />
 
 系统深度集成 **LogicFlow** 实现业务流程的图形化建模与逻辑编排：
 

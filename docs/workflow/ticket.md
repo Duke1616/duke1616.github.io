@@ -2,7 +2,7 @@
 
 工单列表是用户进行流程跟踪及进度查询的统一操作台。无论是手动发起的申请单，还是自动化告警触发的处置单，均在此处进行全生命周期的展示与管理。
 
-<img src="/images/ticket/ticket-overview.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="工单中心总览" />
+<img src="/images/ticket/list/overview.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="工单中心总览" />
 
 ## 1、标签页说明
 
@@ -83,25 +83,25 @@
 
 ### 6.1 表单信息
 
-<img src="/images/ticket/detail-form.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="表单信息" />
+<img src="/images/ticket/list/detail-form.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="表单信息" />
 
 展示工单提交时填写的原始表单数据。在**待办审批**场景下，处理人可在此页面进行审批操作（通过 / 拒绝）或填写处理意见。
 
 ### 6.2 流程图
 
-<img src="/images/ticket/detail-flow.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="流程图" />
+<img src="/images/ticket/list/detail-flow.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="流程图" />
 
 以可视化方式展示当前工单所关联的流程结构，并高亮标注当前所处节点，便于快速了解流程进度。
 
 ### 6.3 审批记录
 
-<img src="/images/ticket/detail-record.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="审批记录" />
+<img src="/images/ticket/list/detail-record.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="审批记录" />
 
 按时间顺序列出工单流转过程中每个节点的处理记录，包括处理人、操作结果及备注信息，完整还原审批轨迹。
 
 ### 6.4 自动化任务
 
-<img src="/images/ticket/detail-task.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="自动化任务" />
+<img src="/images/ticket/list/detail-task.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="自动化任务" />
 
 展示工单流程中自动化节点的执行详情，包括任务状态、执行日志及输出结果，方便排查自动化执行异常。
 

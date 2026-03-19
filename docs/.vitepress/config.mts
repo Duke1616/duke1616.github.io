@@ -33,7 +33,7 @@ export default withMermaid(defineConfig({
           { text: '设计思想', link: '/workflow/concept' },
           {
             text: '工单中心',
-            collapsed: false,
+            collapsed: true,
             items: [
               { text: '提交工单', link: '/workflow/ticket-start' },
               { text: '工单列表', link: '/workflow/ticket' },
@@ -42,7 +42,7 @@ export default withMermaid(defineConfig({
           { text: '模版管理', link: '/workflow/management/template' },
           {
             text: '流程管理',
-            collapsed: false,
+            collapsed: true,
             items: [
               { text: '编排说明', link: '/workflow/management/workflow' },
               {
@@ -61,11 +61,11 @@ export default withMermaid(defineConfig({
             ]
           },
           {
-            text: '使用示例',
+            text: '工单示例',
             collapsed: true,
             items: [
-              { text: '应用发布', link: '/workflow/cases/deploy' },
-              { text: '权限申请', link: '/workflow/cases/permission' }
+              { text: '版本发布', link: '/workflow/cases/deploy' },
+              { text: '飞书集成', link: '/workflow/cases/feishu' }
             ]
           }
         ]

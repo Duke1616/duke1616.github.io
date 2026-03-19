@@ -2,7 +2,7 @@
 
 提交工单页面是用户发起业务申请的入口。系统以工单模板为单位，按分类组织展示，用户选择对应模板后填写表单即可完成工单创建。
 
-<img src="/images/ticket/ticket-start.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="提交工单" />
+<img src="/images/ticket/start/overview.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="提交工单" />
 
 ## 1、页面布局
 

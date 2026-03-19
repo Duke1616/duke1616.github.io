@@ -10,7 +10,7 @@
 
 ## 2. 配置说明
 
-<img src="/images/manager/template.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="模版管理预览" />
+<img src="/images/workflow/template.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="模版管理预览" />
 
 模版配置采用分步导向模式，分为基础信息与表单设计两个阶段：
 
