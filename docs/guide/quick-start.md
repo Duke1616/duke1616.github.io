@@ -43,6 +43,7 @@ go run main.go init ticket-notify-template
 ```
 
 
+
 ## 📚 本地开发指南
 
 1. 安装依赖
@@ -59,9 +60,4 @@ go run main.go start
 ```bash
 go run main.go init
 ```
-
-## 💬 联系我们
-
-如果您在使用过程中遇到任何问题，或需要开通演示环境的可写权限，欢迎交流联系：
-![WeChat QR](/wechat-qr.jpg)
 

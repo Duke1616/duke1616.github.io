@@ -15,8 +15,8 @@ export default withMermaid(defineConfig({
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: '首页', link: '/' },
-      { text: '快速开始', link: '/guide/quick-start' },
-      { text: '系统概览', link: '/guide/introduction' }
+      { text: '系统概览', link: '/guide/introduction' },
+      { text: '快速开始', link: '/guide/quick-start' }
     ],
 
     sidebar: [
