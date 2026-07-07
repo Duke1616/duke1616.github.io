@@ -16,7 +16,8 @@ export default withMermaid(defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '系统概览', link: '/guide/introduction' },
-      { text: '快速开始', link: '/guide/quick-start' }
+      { text: '快速开始', link: '/guide/quick-start' },
+      { text: '演示环境', link: 'http://www.fleetops.top/' }
     ],
 
     sidebar: [
