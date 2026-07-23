@@ -4,7 +4,7 @@
 
 **立即体验**：无需安装，直接访问在线演示环境
 
-- **演示地址**：[http://82.156.165.98:8888](http://82.156.165.98:8888)
+- **演示地址**：[www.fleetops.top](http://www.fleetops.top/)
 - **登录方式**：标准登录
 - **演示账户**：demo
 - **演示密码**：123456
@@ -60,4 +60,3 @@ go run main.go start
 ```bash
 go run main.go init
 ```
-
