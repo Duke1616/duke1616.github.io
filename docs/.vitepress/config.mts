@@ -12,11 +12,26 @@ export default withMermaid(defineConfig({
       provider: 'local'
     },
 
+    outline: {
+      level: [2, 3],
+      label: '本页导航'
+    },
+
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: '首页', link: '/' },
-      { text: '系统概览', link: '/guide/introduction' },
-      { text: '快速开始', link: '/guide/quick-start' },
+      {
+        text: '系统指南',
+        items: [
+          { text: '平台概览与架构', link: '/guide/introduction' },
+          { text: '快速开始', link: '/guide/quick-start' }
+        ]
+      },
+      { text: '身份治理', link: '/eiam/concept' },
+      { text: '资产管理', link: '/cmdb/concept' },
+      { text: '工单中心', link: '/workflow/concept' },
+      { text: '任务中心', link: '/task/template' },
+      { text: '系统运维', link: '/system/deploy' },
       { text: '演示环境', link: 'http://www.fleetops.top/' }
     ],
 
@@ -24,12 +39,43 @@ export default withMermaid(defineConfig({
       {
         text: '系统介绍',
         items: [
-          { text: '核心概览', link: '/guide/introduction' },
+          { text: '平台概览与架构', link: '/guide/introduction' },
           { text: '快速开始', link: '/guide/quick-start' },
         ]
       },
       {
+        text: '身份治理',
+        collapsed: false,
+        items: [
+          { text: '设计理念与架构', link: '/eiam/concept' },
+          { text: '鉴权与数据范围', link: '/eiam/pbac' },
+          { text: '多租户与空间治理', link: '/eiam/tenancy' },
+          { text: '组织架构与人员治理', link: '/eiam/organization' },
+          {
+            text: '身份认证与单点登录',
+            collapsed: false,
+            items: [
+              { text: '身份认证与多源凭据', link: '/eiam/credential' },
+              { text: '统一 IDP 与单点登录', link: '/eiam/idp' }
+            ]
+          },
+          { text: '契约治理工具链', link: '/eiam/tooling' }
+        ]
+      },
+      {
+        text: '资产管理',
+        collapsed: false,
+        items: [
+          { text: '设计理念', link: '/cmdb/concept' },
+          { text: '模型定义', link: '/cmdb/model' },
+          { text: '资产与全文检索', link: '/cmdb/asset' },
+          { text: '拓扑与关联图谱', link: '/cmdb/relation' },
+          { text: '微服务插件体系', link: '/cmdb/plugin' }
+        ]
+      },
+      {
         text: '工单模块',
+        collapsed: false,
         items: [
           { text: '设计思想', link: '/workflow/concept' },
           {
@@ -73,9 +119,17 @@ export default withMermaid(defineConfig({
       },
       {
         text: '任务中心',
+        collapsed: false,
         items: [
           { text: '任务模版', link: '/task/template' },
           { text: '执行节点', link: '/task/execution' }
+        ]
+      },
+      {
+        text: '系统运维',
+        collapsed: false,
+        items: [
+          { text: '生产部署与高可用', link: '/system/deploy' }
         ]
       }
     ],

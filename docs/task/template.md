@@ -70,7 +70,6 @@ if __name__ == "__main__":
     main()
 ```
 
----
 
 ## 3. 执行单元配置
 
@@ -102,7 +101,6 @@ if __name__ == "__main__":
 - **变量环境**：支持为每个绑定的执行单元配置独立的环境变量。
 ![变量配置](/images/codebook/template/variables.png)
 
----
 
 ## 4. 记录脚本执行结果
 
@@ -149,7 +147,6 @@ builder.finalize_json()
 ```
 ---
 
----
 
 ## 5. 任务分发逻辑
 

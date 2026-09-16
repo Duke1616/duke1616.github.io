@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "render:arch": "cd tools/render-arch && PATH=\"/usr/local/go/bin:$PATH\" go run main.go"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +16,7 @@
   "packageManager": "pnpm@10.15.0",
   "devDependencies": {
     "dayjs": "^1.11.20",
+    "medium-zoom": "^1.1.0",
     "mermaid": "^11.13.0",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17",

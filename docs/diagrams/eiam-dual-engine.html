@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>EIAM 鉴权全链路流转图 · Casbin + OPA 双引擎协同架构</title>
+  <!-- 本地加载项目内置的 Vue 3 运行时，离线极速渲染 -->
+  <script src="../../node_modules/vue/dist/vue.global.prod.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #0b0f17;
+      color: #e6edf3;
+      width: 1360px;
+      min-height: 660px;
+      padding: 24px 36px;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #1f293d;
+      margin-bottom: 24px;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #8b9bb4;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: 4px;
+      color: #58a6ff;
+      background: rgba(56, 166, 255, 0.12);
+      border: 1px solid rgba(56, 166, 255, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 画布与三列网格布局：宽间距 195px，彻底消除任何胶囊与卡片的碰撞 */
+    .diagram-canvas {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 195px;
+      flex: 1;
+      margin-top: 4px;
+    }
+
+    /* 左右中三列容器 */
+    .col-left,
+    .col-center,
+    .col-right {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 2;
+    }
+
+    .col-left {
+      width: 275px;
+      gap: 10px;
+    }
+
+    .col-center {
+      width: 295px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      height: 586px;
+      justify-content: space-between;
+    }
+
+    .col-right {
+      width: 280px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      height: 586px;
+      justify-content: space-between;
+    }
+
+    .node-pass {
+      border-color: #238636;
+      background: linear-gradient(145deg, #112418, #0b1710);
+    }
+
+    .node-pass .node-tag {
+      background: rgba(35, 134, 54, 0.2);
+      color: #7ee787;
+      border: 1px solid rgba(35, 134, 54, 0.4);
+    }
+
+    /* 通用卡片节点 */
+    .node-box {
+      border: 1px solid #283754;
+      border-radius: 8px;
+      padding: 11px 13px;
+      background: #0f1523;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      position: relative;
+    }
+
+    /* 节点颜色主题 */
+    .node-request {
+      border-color: #1f6feb;
+      background: linear-gradient(145deg, #121927, #0d131e);
+    }
+
+    .node-request .node-tag {
+      background: rgba(56, 139, 253, 0.2);
+      color: #58a6ff;
+      border: 1px solid rgba(56, 139, 253, 0.4);
+    }
+
+    .node-casbin {
+      border-color: #1f6feb;
+      background: linear-gradient(145deg, #131b2c, #0d1420);
+    }
+
+    .node-casbin .node-tag {
+      background: rgba(56, 139, 253, 0.2);
+      color: #58a6ff;
+      border: 1px solid rgba(56, 139, 253, 0.4);
+    }
+
+    .node-policy {
+      border-color: #8957e5;
+      background: linear-gradient(145deg, #1a142e, #110d20);
+    }
+
+    .node-policy .node-tag {
+      background: rgba(137, 87, 229, 0.2);
+      color: #d2a8ff;
+      border: 1px solid rgba(137, 87, 229, 0.4);
+    }
+
+    .node-opa {
+      border-color: #238636;
+      background: linear-gradient(145deg, #0f2018, #0a1711);
+    }
+
+    .node-opa .node-tag {
+      background: rgba(35, 134, 54, 0.2);
+      color: #7ee787;
+      border: 1px solid rgba(35, 134, 54, 0.4);
+    }
+
+    .node-scope {
+      border-color: #d29922;
+      background: linear-gradient(145deg, #241e12, #181309);
+    }
+
+    .node-scope .node-tag {
+      background: rgba(210, 153, 34, 0.2);
+      color: #f2cc60;
+      border: 1px solid rgba(210, 153, 34, 0.4);
+    }
+
+    .node-deny {
+      border-color: #da3633;
+      background: linear-gradient(145deg, #2a1114, #1b0a0d);
+    }
+
+    .node-deny .node-tag {
+      background: rgba(218, 54, 51, 0.2);
+      color: #ff7b72;
+      border: 1px solid rgba(218, 54, 51, 0.4);
+    }
+
+    .node-biz {
+      border-color: #1f6feb;
+      background: linear-gradient(145deg, #131b28, #0e141e);
+    }
+
+    .node-biz .node-tag {
+      background: rgba(56, 139, 253, 0.2);
+      color: #58a6ff;
+      border: 1px solid rgba(56, 139, 253, 0.4);
+    }
+
+    /* 节点头部 */
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .node-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .node-tag {
+      font-size: 9px;
+      padding: 1.5px 6px;
+      border-radius: 3px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+    }
+
+    .node-desc {
+      font-size: 11px;
+      color: #8b9bb4;
+      line-height: 1.35;
+    }
+
+    /* 键值列表 */
+    .mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4.5px;
+    }
+
+    .mini-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #090e17;
+      padding: 3.5px 7px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .mini-label {
+      color: #8b9bb4;
+    }
+
+    .mini-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: #e6edf3;
+      padding: 1px 5px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    /* 列内垂直连接胶囊 */
+    .flow-connector-vertical {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 0;
+    }
+
+    .connector-line-up,
+    .connector-line-down {
+      width: 2px;
+      height: 7px;
+      background: #283754;
+    }
+
+    .connector-badge {
+      background: #0b0f17;
+      border: 1px solid #283754;
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8b9bb4;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .connector-badge.blue {
+      border-color: rgba(56, 139, 253, 0.4);
+      color: #79c0ff;
+    }
+
+    .connector-badge.purple {
+      border-color: rgba(137, 87, 229, 0.4);
+      color: #d2a8ff;
+    }
+
+    /* 代码块与高亮表达式 */
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 5px;
+      padding: 6px 8px;
+      color: #79c0ff;
+      line-height: 1.35;
+    }
+
+    .code-box.gold {
+      color: #f2cc60;
+      border-color: rgba(210, 153, 34, 0.35);
+      background: rgba(210, 153, 34, 0.06);
+    }
+
+    /* 全局 SVG 连线系统 */
+    .svg-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 线条上的指示胶囊：纯黑底色覆盖，精致发光边框，100% 骑压在线条上 */
+    .flow-badge {
+      position: absolute;
+      padding: 2.5px 9px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+      z-index: 10;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+      background: #0b0f17;
+      border: 1px solid #283754;
+      color: #8b9bb4;
+      line-height: 1.4;
+    }
+
+    .flow-badge.blue {
+      border-color: rgba(56, 139, 253, 0.55);
+      color: #79c0ff;
+    }
+
+    .flow-badge.purple {
+      border-color: rgba(137, 87, 229, 0.55);
+      color: #d2a8ff;
+    }
+
+    .flow-badge.green {
+      border-color: rgba(63, 185, 80, 0.55);
+      color: #7ee787;
+    }
+
+    .flow-badge.red {
+      border-color: rgba(248, 81, 73, 0.55);
+      color: #ff7b72;
+    }
+
+    .flow-badge.gold {
+      border-color: rgba(210, 153, 34, 0.55);
+      color: #f2cc60;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="app">
+    <!-- 顶部标题栏 -->
+    <div class="header">
+      <div class="title-left">
+        <div class="title">{{ config.title }}</div>
+        <div class="subtitle">{{ config.subtitle }}</div>
+      </div>
+      <div class="header-badge">AUTHORIZATION PIPELINE</div>
+    </div>
+
+    <!-- 图表核心布局区域 -->
+    <div class="diagram-canvas" id="diagram-canvas">
+
+      <!-- 左列：输入与主体解析 -->
+      <div class="col-left">
+        <!-- 节点 1: 客户端请求 -->
+        <div class="node-box node-request" id="node-request">
+          <div class="node-header">
+            <span class="node-title">客户端请求</span>
+            <span class="node-tag">REQUEST</span>
+          </div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">主体身份:</span>
+              <span class="mini-val">{{ request.username }}</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">请求接口:</span>
+              <span class="mini-val">{{ request.api }}</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">对应动作:</span>
+              <span class="mini-val" style="color: #7ee787;">{{ request.action }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 胶囊 1: 提取主体标识 -->
+        <div class="flow-connector-vertical">
+          <div class="connector-line-up"></div>
+          <div class="connector-badge blue">
+            <span>提取主体标识 ↓</span>
+          </div>
+          <div class="connector-line-down"></div>
+        </div>
+
+        <!-- 节点 2: Casbin 引擎 -->
+        <div class="node-box node-casbin" id="node-casbin">
+          <div class="node-header">
+            <span class="node-title">Casbin 引擎</span>
+            <span class="node-tag">算主体</span>
+          </div>
+          <div class="node-desc">展开继承身份链 (DAG):</div>
+          <div class="mini-list">
+            <div class="mini-item" v-for="item in subjects" :key="item.label">
+              <span class="mini-label">{{ item.label }}</span>
+              <span class="mini-val">{{ item.val }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 胶囊 2: 展开主体全集 (含用户自身) -->
+        <div class="flow-connector-vertical">
+          <div class="connector-line-up"></div>
+          <div class="connector-badge purple">
+            <span>展开主体全集 (含用户自身) ↓</span>
+          </div>
+          <div class="connector-line-down"></div>
+        </div>
+
+        <!-- 节点 3: 策略汇聚 -->
+        <div class="node-box node-policy" id="node-policy">
+          <div class="node-header">
+            <span class="node-title">策略汇聚</span>
+            <span class="node-tag">拿策略</span>
+          </div>
+          <div class="node-desc">汇聚直绑与继承的全部策略:</div>
+          <div class="mini-list">
+            <div class="mini-item" v-for="p in policySources" :key="p.label">
+              <span class="mini-label">{{ p.label }}</span>
+              <span class="mini-val" :style="{ color: p.color || '#e6edf3' }">{{ p.val }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中列：策略裁决与数据范围 -->
+      <div class="col-center">
+        <!-- 节点 4: OPA 引擎 -->
+        <div class="node-box node-opa" id="node-opa">
+          <div class="node-header">
+            <span class="node-title">OPA 引擎</span>
+            <span class="node-tag">判准入</span>
+          </div>
+          <div class="node-desc">PBAC 规则匹配与环境校验:</div>
+          <div class="mini-list">
+            <div class="mini-item" v-for="step in opaSteps" :key="step.label">
+              <span class="mini-label">{{ step.label }}</span>
+              <span class="mini-val" :style="{ color: step.color }">{{ step.val }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 节点 5: AccessScope (下沉至底部与两侧对齐) -->
+        <div class="node-box node-scope" id="node-scope">
+          <div class="node-header">
+            <span class="node-title">AccessScope</span>
+            <span class="node-tag">定范围</span>
+          </div>
+          <div class="node-desc" style="color: #f2cc60; font-size: 10.5px;">
+            动态解析上下文，下发行级过滤谓词树
+          </div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">变量解析:</span>
+              <span class="mini-val">ref(username) ➔ "zhangsan"</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">残差表达式:</span>
+              <span class="mini-val">ticket.create_by == "zhangsan"</span>
+            </div>
+          </div>
+          <div class="code-box gold" style="margin-top: 2px;">
+            predicate: { key: "create_by", op: "Eq", val: "user" }
+          </div>
+        </div>
+      </div>
+
+      <!-- 右列：决策执行结果（严格上下对称排列） -->
+      <div class="col-right">
+        <!-- 节点 6: 403 阻断 -->
+        <div class="node-box node-deny" id="node-deny">
+          <div class="node-header">
+            <span class="node-title">403 Forbidden</span>
+            <span class="node-tag">DENIED</span>
+          </div>
+          <div class="node-desc" style="color: #ff7b72; font-weight: 500;">
+            请求被拦截阻断
+          </div>
+          <div class="node-desc">
+            命中显式 Deny，或未满足 Allow / Condition 准入条件。
+          </div>
+        </div>
+
+        <!-- 节点 7: 常规业务放行（无 Scope 约束路径） -->
+        <div class="node-box node-pass" id="node-pass">
+          <div class="node-header">
+            <span class="node-title">常规业务放行</span>
+            <span class="node-tag">DIRECT PASS</span>
+          </div>
+          <div class="node-desc" style="color: #7ee787; font-weight: 500;">
+            功能准入通过 · 直接透传
+          </div>
+          <div class="node-desc">
+            仅做接口动作鉴权，无数据范围约束，直接放行执行。
+          </div>
+        </div>
+
+        <!-- 节点 8: 业务微服务消费 -->
+        <div class="node-box node-biz" id="node-biz">
+          <div class="node-header">
+            <span class="node-title">业务微服务</span>
+            <span class="node-tag">DATA PLANE</span>
+          </div>
+          <div class="node-desc">
+            参数化 SQL 安全过滤:
+          </div>
+          <div class="code-box gold">
+            WHERE create_by = ?
+          </div>
+          <div class="node-desc" style="font-size: 10px; color: #8b9bb4;">
+            仅返回当前主体有权查阅的受控数据行。
+          </div>
+        </div>
+      </div>
+
+      <!-- 动态平滑 SVG 连线系统 -->
+      <svg class="svg-canvas" id="svg-canvas">
+        <defs>
+          <marker id="arrow-blue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#388bfd" />
+          </marker>
+          <marker id="arrow-purple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#8957e5" />
+          </marker>
+          <marker id="arrow-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#3fb950" />
+          </marker>
+          <marker id="arrow-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#f85149" />
+          </marker>
+          <marker id="arrow-gold" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#d29922" />
+          </marker>
+        </defs>
+
+        <!-- 6 条核心连线 -->
+        <path id="path-req-opa" stroke="#388bfd" stroke-width="2" marker-end="url(#arrow-blue)" fill="none" />
+        <path id="path-pol-opa" stroke="#8957e5" stroke-width="2" marker-end="url(#arrow-purple)" fill="none" />
+        <path id="path-opa-deny" stroke="#f85149" stroke-width="2" marker-end="url(#arrow-red)" fill="none" />
+        <path id="path-opa-pass" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow-green)" fill="none" />
+        <path id="path-opa-scope" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow-green)" fill="none" />
+        <path id="path-scope-biz" stroke="#d29922" stroke-width="2" marker-end="url(#arrow-gold)" fill="none" />
+      </svg>
+
+      <!-- 6 个核心胶囊（端端正正压在线条正中心） -->
+      <div class="flow-badge blue" id="badge-req-opa">Action & Resource 意图</div>
+      <div class="flow-badge purple" id="badge-pol-opa">有效策略集 Effective (直属+继承)</div>
+      <div class="flow-badge red" id="badge-opa-deny">显式 Deny / 未命中</div>
+      <div class="flow-badge green" id="badge-opa-pass">命中 Allow 无 Scope</div>
+      <div class="flow-badge green" id="badge-opa-scope">命中 Allow + Scope</div>
+      <div class="flow-badge gold" id="badge-scope-biz">下发残留谓词树</div>
+
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted, nextTick } = Vue;
+
+    createApp({
+      setup() {
+        const config = ref({
+          title: "EIAM 鉴权全链路流转图 · Casbin + OPA 双引擎协同架构",
+          subtitle: "解耦主体图计算与细粒度策略裁决：Casbin 算“我是谁”，OPA 算“我能干什么与能看哪部分数据”"
+        });
+
+        const request = ref({
+          username: "zhangsan",
+          api: "POST /api/v1/tickets/history",
+          action: "ticket:manager:history"
+        });
+
+        const subjects = ref([
+          { label: "主体基准", val: "user:zhangsan (支持直绑)" },
+          { label: "所属组织", val: "group:frontend" },
+          { label: "直接角色", val: "role:editor" },
+          { label: "继承角色", val: "role:viewer" }
+        ]);
+
+        const policySources = ref([
+          { label: "用户直属策略", val: "User Direct Attached", color: "#d2a8ff" },
+          { label: "组织继承策略", val: "Group Inherited" },
+          { label: "角色附加策略", val: "Role Attached" },
+          { label: "角色内联策略", val: "Role Inline", color: "#d2a8ff" }
+        ]);
+
+        const opaSteps = ref([
+          { label: "动作与资源匹配", val: "ticket:manager:history & *", color: "#7ee787" },
+          { label: "Condition 环境校验", val: "时间 / IP / MFA 准入", color: "#7ee787" },
+          { label: "Deny 显式拒绝", val: "一票否决阻断", color: "#ff7b72" },
+          { label: "未命中任何规则", val: "默认隐式拒绝", color: "#8b9bb4" }
+        ]);
+
+        // 动态计算平滑顺畅的连接线
+        const updateConnections = () => {
+          const canvas = document.getElementById('diagram-canvas');
+          if (!canvas) return;
+          const cRect = canvas.getBoundingClientRect();
+
+          const getPoint = (elId, side, offsetY = 0) => {
+            const el = document.getElementById(elId);
+            if (!el) return { x: 0, y: 0 };
+            const r = el.getBoundingClientRect();
+            if (side === 'top') {
+              return {
+                x: r.left + r.width / 2 - cRect.left,
+                y: r.top - cRect.top + offsetY
+              };
+            }
+            if (side === 'bottom') {
+              return {
+                x: r.left + r.width / 2 - cRect.left,
+                y: r.bottom - cRect.top + offsetY
+              };
+            }
+            return {
+              x: (side === 'right' ? r.right : r.left) - cRect.left,
+              y: r.top + r.height / 2 - cRect.top + offsetY
+            };
+          };
+
+          const setStraightLine = (pathId, p1, p2) => {
+            const path = document.getElementById(pathId);
+            if (!path) return;
+            path.setAttribute('d', `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`);
+          };
+
+          const setSmoothLine = (pathId, p1, p2) => {
+            const path = document.getElementById(pathId);
+            if (!path) return;
+            const dx = (p2.x - p1.x) * 0.5;
+            path.setAttribute('d', `M ${p1.x} ${p1.y} C ${p1.x + dx} ${p1.y}, ${p2.x - dx} ${p2.y}, ${p2.x} ${p2.y}`);
+          };
+
+          // 圆角折线：先水平延伸，圆弧转角后垂直，再圆弧转角水平到终点
+          // 适用于起点右侧、终点不在同一水平线的场景（如 OPA -> Deny / Pass）
+          const setElbowLine = (pathId, p1, p2, r = 14) => {
+            const path = document.getElementById(pathId);
+            if (!path) return;
+            const dy = p2.y - p1.y;
+            const dx = p2.x - p1.x;
+            const midX = p1.x + dx * 0.55; // 折点 X 位置
+            const dirY = dy >= 0 ? 1 : -1;
+            const safeR = Math.min(r, Math.abs(dy) / 2, Math.abs(dx) / 2);
+            const d = [
+              `M ${p1.x} ${p1.y}`,
+              `H ${midX - safeR}`,
+              `Q ${midX} ${p1.y} ${midX} ${p1.y + dirY * safeR}`,
+              `V ${p2.y - dirY * safeR}`,
+              `Q ${midX} ${p2.y} ${midX + safeR} ${p2.y}`,
+              `H ${p2.x}`
+            ].join(' ');
+            path.setAttribute('d', d);
+          };
+
+          // 核心胶囊定位：取贝塞尔曲线/直线几何中点 (len * 0.5)，100% 绝对压在线条上
+          const setBadgeOnPath = (badgeId, pathId) => {
+            const badge = document.getElementById(badgeId);
+            const path = document.getElementById(pathId);
+            if (!badge || !path) return;
+            const len = path.getTotalLength();
+            const p = path.getPointAtLength(len * 0.5);
+            badge.style.left = `${p.x}px`;
+            badge.style.top = `${p.y}px`;
+          };
+
+          // 1. Request -> OPA (水平纯正蓝线)
+          const pReq = getPoint('node-request', 'right');
+          const pOpaBase = getPoint('node-opa', 'left');
+          const pOpaTarget = { x: pOpaBase.x, y: pReq.y };
+          setStraightLine('path-req-opa', pReq, pOpaTarget);
+          setBadgeOnPath('badge-req-opa', 'path-req-opa');
+
+          // 2. Policy -> OPA (平滑贝塞尔曲线，正中压着 ② 有效策略集)
+          const pPol = getPoint('node-policy', 'right');
+          const pOpaLeftBottom = getPoint('node-opa', 'left', 40);
+          setSmoothLine('path-pol-opa', pPol, pOpaLeftBottom);
+          setBadgeOnPath('badge-pol-opa', 'path-pol-opa');
+
+          // 3. OPA -> Deny（水平直线：起点 X 取 OPA 右侧，Y 对齐到 Deny 节点垂直中心）
+          const pDeny = getPoint('node-deny', 'left');
+          const pOpaRight = getPoint('node-opa', 'right');
+          const pOpaRightTop = { x: pOpaRight.x, y: pDeny.y };
+          setStraightLine('path-opa-deny', pOpaRightTop, pDeny);
+          setBadgeOnPath('badge-opa-deny', 'path-opa-deny');
+
+          // 4. OPA -> 常规业务放行（平滑贝塞尔曲线，参考 策略汇聚 -> OPA 引擎连线）
+          const pPass = getPoint('node-pass', 'left');
+          const pOpaRightLow = getPoint('node-opa', 'right', 40);
+          setSmoothLine('path-opa-pass', pOpaRightLow, pPass);
+          setBadgeOnPath('badge-opa-pass', 'path-opa-pass');
+
+          // 5. OPA -> AccessScope (垂直纯正绿线，正中央压着 命中 Allow + Scope)
+          const pOpaBottom = getPoint('node-opa', 'bottom');
+          const pScopeTop = getPoint('node-scope', 'top');
+          setStraightLine('path-opa-scope', pOpaBottom, pScopeTop);
+          setBadgeOnPath('badge-opa-scope', 'path-opa-scope');
+
+          // 6. Scope -> Biz（水平直线：起点 X 取 Scope 右侧，Y 对齐到 Biz 节点垂直中心）
+          const pBiz = getPoint('node-biz', 'left');
+          const pScopeRight = getPoint('node-scope', 'right');
+          const pScope = { x: pScopeRight.x, y: pBiz.y };
+          setStraightLine('path-scope-biz', pScope, pBiz);
+          setBadgeOnPath('badge-scope-biz', 'path-scope-biz');
+        };
+
+        window.updateConnections = updateConnections;
+
+        onMounted(() => {
+          nextTick(() => {
+            updateConnections();
+            window.addEventListener('resize', updateConnections);
+            setTimeout(updateConnections, 50);
+            setTimeout(updateConnections, 200);
+          });
+        });
+
+        return {
+          config,
+          request,
+          subjects,
+          policySources,
+          opaSteps
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+
+</html>

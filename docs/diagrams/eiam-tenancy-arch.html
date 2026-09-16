@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIAM 多租户数据隔离机制 (Tenant to GORM)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0e17;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: 24px 28px;
+      width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 顶部标题区 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1f293d;
+      padding-bottom: 12px;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #4ade80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .header-badge {
+      font-size: 10.5px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 主流程容器：3 阶段流转 */
+    .flow-container {
+      display: grid;
+      grid-template-columns: 320px 42px 390px 42px 320px;
+      align-items: stretch;
+      gap: 0;
+      flex: 1;
+    }
+
+    /* 阶段面板 */
+    .stage-panel {
+      background: #111622;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stage-1 .panel-title { color: #38bdf8; }
+    .stage-2 .panel-title { color: #4ade80; }
+    .stage-3 .panel-title { color: #c084fc; }
+
+    .panel-sub {
+      font-size: 10.5px;
+      color: #64748b;
+    }
+
+    /* 卡片通用样式（轻量大方） */
+    .card {
+      background: #0d121c;
+      border: 1px solid #243048;
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+
+    .badge-cyan {
+      position: absolute;
+      top: 9px;
+      right: 10px;
+      font-size: 9px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .badge-green {
+      position: absolute;
+      top: 9px;
+      right: 10px;
+      font-size: 9px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      position: absolute;
+      top: 9px;
+      right: 10px;
+      font-size: 9px;
+      background: rgba(192, 132, 252, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(192, 132, 252, 0.35);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-desc {
+      font-size: 10.5px;
+      color: #8191a7;
+      line-height: 1.45;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 5px;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      font-size: 9.5px;
+      background: #182234;
+      border: 1px solid #29384e;
+      color: #94a3b8;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .sql-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10px;
+      background: #070b14;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 5px 8px;
+      color: #38bdf8;
+      margin-top: 2px;
+    }
+
+    .sql-box.shared {
+      color: #4ade80;
+      border-color: rgba(74, 222, 128, 0.3);
+    }
+
+    /* 阶段间流转指示 */
+    .connector-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .connector-arrow {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .connector-text {
+      font-size: 9.5px;
+      color: #64748b;
+      writing-mode: vertical-rl;
+      letter-spacing: 2px;
+      margin-top: 3px;
+    }
+
+    /* 底部辅助底栏（轻量透气） */
+    .footer-bar {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      align-items: center;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .footer-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .footer-item strong {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .dot-blue {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+    }
+
+    .dot-green {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+    }
+
+    .dot-purple {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #c084fc;
+      box-shadow: 0 0 6px rgba(192, 132, 252, 0.4);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 顶部标题 -->
+  <div class="header">
+    <div class="title-left">
+      <div class="title">EIAM 多租户数据隔离流转架构</div>
+      <div class="subtitle">双租户上下文解耦 · GORMx Fail-Closed 零信任拦截 · 共享模型智能合并</div>
+    </div>
+    <div class="header-badge">TENANT TO GORM</div>
+  </div>
+
+  <!-- 主架构图三阶段流转 -->
+  <div class="flow-container">
+
+    <!-- 阶段 1：双租户上下文注入与解耦 -->
+    <div class="stage-panel stage-1">
+      <div class="panel-header">
+        <span class="panel-title">1. 双租户上下文提取</span>
+        <span class="panel-sub">Context Engine</span>
+      </div>
+
+      <!-- 身份归属租户 -->
+      <div class="card">
+        <span class="badge-cyan">不可变</span>
+        <div class="card-title">身份归属 (origin_tenant_id)</div>
+        <div class="card-desc">账号真实的母体身份，Casbin 权限判定基石。</div>
+        <div class="tag-row">
+          <span class="tag">身份平面</span>
+          <span class="tag">跨租户防越权</span>
+        </div>
+      </div>
+
+      <!-- 数据操作租户 -->
+      <div class="card">
+        <span class="badge-cyan">动态指定</span>
+        <div class="card-title">数据操作 (tenant_id)</div>
+        <div class="card-desc">当前工作空间，控制业务数据读写过滤边界。</div>
+        <div class="tag-row">
+          <span class="tag">数据平面</span>
+          <span class="tag">随顶部随时切换</span>
+        </div>
+      </div>
+
+      <!-- 空间矩阵 -->
+      <div class="card" style="margin-top: auto;">
+        <div class="card-title">三级租户空间</div>
+        <div class="card-desc">
+          • 系统根租户 (ID: 1)：system 母体全局治理<br>
+          • 个人空间：{username}-personal 超管沙箱<br>
+          • 企业租户：各业务线与团队协作空间
+        </div>
+      </div>
+    </div>
+
+    <!-- 连接符 1 -> 2 -->
+    <div class="connector-col">
+      <div class="connector-arrow">➔</div>
+      <div class="connector-text">Hook 拦截</div>
+    </div>
+
+    <!-- 阶段 2：GORMx 多租户插件拦截处理 -->
+    <div class="stage-panel stage-2">
+      <div class="panel-header">
+        <span class="panel-title">2. GORMx 零信任安全拦截</span>
+        <span class="panel-sub">TenantPlugin Hooks</span>
+      </div>
+
+      <!-- 写屏障 -->
+      <div class="card">
+        <span class="badge-green">Create Hook</span>
+        <div class="card-title">自动写屏障注入</div>
+        <div class="card-desc">新增实体时自动从上下文提取当前有效 tenant_id 设入模型。</div>
+        <div class="tag-row">
+          <span class="tag">gorm:create 前置钩子</span>
+          <span class="tag">防业务漏传</span>
+        </div>
+      </div>
+
+      <!-- 读屏障 Fail-Closed -->
+      <div class="card">
+        <span class="badge-green">Query Hook</span>
+        <div class="card-title">Fail-Closed 零信任读屏障</div>
+        <div class="card-desc">对具备租户字段的模型强制校验，缺失租户（tid &le; 0）直接阻断。</div>
+        <div class="tag-row">
+          <span class="tag">零信任拦截</span>
+          <span class="tag">拒绝隐式越权</span>
+        </div>
+      </div>
+
+      <!-- 共享模型处理 -->
+      <div class="card" style="margin-top: auto;">
+        <span class="badge-green">eiam:"shared"</span>
+        <div class="card-title">公共资源共享融合</div>
+        <div class="card-desc">对应用 (Application) 等共享模型，普通租户自动合并系统根租户全局数据。</div>
+        <div class="tag-row">
+          <span class="tag">自动 SQL 重写</span>
+          <span class="tag">私有与公共无缝融合</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 连接符 2 -> 3 -->
+    <div class="connector-col">
+      <div class="connector-arrow">➔</div>
+      <div class="connector-text">SQL 执行</div>
+    </div>
+
+    <!-- 阶段 3：数据层隔离执行与持久化 -->
+    <div class="stage-panel stage-3">
+      <div class="panel-header">
+        <span class="panel-title">3. 数据层隔离执行</span>
+        <span class="panel-sub">Storage Boundary</span>
+      </div>
+
+      <!-- 常规隔离查询 -->
+      <div class="card">
+        <span class="badge-purple">私有数据</span>
+        <div class="card-title">常规资源隔离查询</div>
+        <div class="card-desc">严格限制在当前操作租户内部，物理级数据隔离。</div>
+        <div class="sql-box">WHERE tenant_id = ?</div>
+      </div>
+
+      <!-- 共享资源查询 -->
+      <div class="card">
+        <span class="badge-purple">共享数据</span>
+        <div class="card-title">共享资源联合查询</div>
+        <div class="card-desc">自动融合本租户配置与系统根租户（ID: 1）公共应用。</div>
+        <div class="sql-box shared">WHERE tenant_id = ? OR tenant_id = 1</div>
+      </div>
+
+      <!-- 严格写屏障 -->
+      <div class="card" style="margin-top: auto;">
+        <div class="card-title">更新与删除行级防穿透</div>
+        <div class="card-desc">Update / Delete 操作由插件严格锁死当前租户范围，杜绝任何篡改。</div>
+        <div class="tag-row">
+          <span class="tag">防横向越权</span>
+          <span class="tag">防纵向越权</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 底部说明栏（轻量精炼） -->
+  <div class="footer-bar">
+    <div class="footer-item">
+      <span class="dot-blue"></span>
+      <span><strong>上下文解耦</strong>：origin_tenant_id 锚定身份 · tenant_id 动态指定当前数据域</span>
+    </div>
+    <div class="footer-item">
+      <span class="dot-green"></span>
+      <span><strong>零信任拦截</strong>：Fail-Closed 缺失即阻断 · 自动写屏障防业务漏写</span>
+    </div>
+    <div class="footer-item">
+      <span class="dot-purple"></span>
+      <span><strong>存储隔离</strong>：私有资源严格隔离 · eiam:"shared" 动态合并系统根租户 (ID: 1)</span>
+    </div>
+  </div>
+
+</body>
+
+</html>

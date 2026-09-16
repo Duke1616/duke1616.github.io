@@ -12,7 +12,6 @@ ECMDB 将工单系统与飞书进行集成，实现了审批、执行和结果�
 - **便捷撤回**：如果发现填错，**直接在卡片中填写撤回原因并点击“撤销”按钮**，无需返回 Web 后台即可终止流程。
 <img src="/images/ticket/cases/feishu/start.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="提单通知" />
 
----
 
 ## 2. 卡片式审批中心
 
@@ -33,7 +32,6 @@ ECMDB 将工单系统与飞书进行集成，实现了审批、执行和结果�
 流程流转过程中的关键变动会同步推送到相关协作人员，保持团队内部信息透明。
 <img src="/images/ticket/cases/feishu/cc.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="抄送通知" />
 
----
 
 ## 3. 自动化任务反馈
 
@@ -47,7 +45,6 @@ ECMDB 将工单系统与飞书进行集成，实现了审批、执行和结果�
 自动化处理完成后，系统会将产生的 Stdout/Stderr 日志摘要及最终结论实时推送到干系人。发版是否成功、执行了哪些模块，卡片一目了然。
 <img src="/images/ticket/cases/feishu/automation.png" style="width: 100%; border-radius: 8px; margin: 16px 0;" alt="自动化执行通知" />
 
----
 
 ## 4. 全生命周期流程追踪
 

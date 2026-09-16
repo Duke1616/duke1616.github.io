@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>EIAM 身份认证与 JIT 个人租户体系架构</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #0b0f17;
+      color: #e6edf3;
+      width: 1240px;
+      min-height: 520px;
+      padding: 20px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 11px;
+      border-bottom: 1px solid #1f293d;
+      margin-bottom: 14px;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #8b9bb4;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 主架构三列容器 */
+    .arch-container {
+      display: grid;
+      grid-template-columns: 330px 40px 420px 40px 320px;
+      align-items: stretch;
+      gap: 0;
+      flex: 1;
+    }
+
+    /* 列面板 */
+    .column-panel {
+      background: #111622;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 11px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .col-auth .panel-title {
+      color: #38bdf8;
+    }
+
+    .col-jit .panel-title {
+      color: #4ade80;
+    }
+
+    .col-space .panel-title {
+      color: #c084fc;
+    }
+
+    .panel-sub {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    /* 卡片通用样式 */
+    .card {
+      background: #0d121c;
+      border: 1px solid #243048;
+      border-radius: 6px;
+      padding: 7px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3.5px;
+      position: relative;
+    }
+
+    .badge-cyan {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 9.5px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .badge-nomfa {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 9.5px;
+      background: rgba(34, 197, 94, 0.18);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-desc {
+      font-size: 10px;
+      color: #94a3b8;
+      line-height: 1.35;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 4px;
+      margin-top: 1px;
+    }
+
+    .tag {
+      font-size: 9.5px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: #162032;
+      border: 1px solid #283754;
+      color: #cbd5e1;
+    }
+
+    /* JIT 流水线节点列表 */
+    .jit-pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 6.5px;
+      flex: 1;
+      justify-content: space-between;
+    }
+
+    .jit-step {
+      background: #0d121c;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .jit-step.highlight {
+      border: 1px solid #15803d;
+      background: linear-gradient(145deg, #0b1f13, #08150d);
+    }
+
+    .step-num {
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      background: #1e293b;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .jit-step.highlight .step-num {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    .step-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5px;
+      min-width: 0;
+    }
+
+    .step-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .step-desc {
+      font-size: 10px;
+      color: #8191a7;
+    }
+
+    /* 双轨多租户卡片 */
+    .space-card {
+      background: #0d121c;
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .space-personal {
+      border: 1px solid #9333ea;
+      background: linear-gradient(145deg, #1d102e, #100a1c);
+    }
+
+    .space-org {
+      border: 1px solid #d97706;
+      background: linear-gradient(145deg, #271707, #150d04);
+    }
+
+    .space-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .space-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .role-badge-admin {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(168, 85, 247, 0.25);
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      color: #e9d5ff;
+      font-weight: 600;
+    }
+
+    .role-badge-member {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+      font-weight: 600;
+    }
+
+    .space-features {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .feature-item {
+      font-size: 10px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .feature-item::before {
+      content: "•";
+      color: #94a3b8;
+    }
+
+    /* 列间连接指示符 */
+    .connector-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .connector-arrow {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .connector-text {
+      font-size: 9.5px;
+      color: #64748b;
+      writing-mode: vertical-rl;
+      letter-spacing: 2px;
+      margin-top: 3px;
+    }
+
+    /* 底部辅助底栏（轻量透气设计） */
+    .footer-bar {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      align-items: center;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .footer-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .footer-item strong {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .dot-blue {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+    }
+
+    .dot-green {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+    }
+
+    .dot-purple {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #c084fc;
+      box-shadow: 0 0 6px rgba(192, 132, 252, 0.4);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 顶部标题 -->
+  <div class="header">
+    <div class="title-left">
+      <div class="title">EIAM 身份认证与 JIT 个人租户体系架构</div>
+      <div class="subtitle">全局唯一 username 为核心主轴 · LDAP 自动建号 / 本地账密主认证 · 飞书首次绑定后续免密 · JIT 专属个人空间</div>
+    </div>
+    <div class="header-badge">ENTERPRISE IDENTITY MATRIX</div>
+  </div>
+
+  <!-- 主架构图三列流转 -->
+  <div class="arch-container">
+
+    <!-- 第一列：统一认证源与策略路由 -->
+    <div class="column-panel col-auth">
+      <div class="panel-header">
+        <span class="panel-title">1. 认证源与凭据接入</span>
+        <span class="panel-sub">主源确立 / 快捷绑定</span>
+      </div>
+
+      <!-- 企业 LDAP -->
+      <div class="card">
+        <span class="badge-cyan">主认证 · 自动建号</span>
+        <div class="card-title">企业目录服务 (LDAP / AD)</div>
+        <div class="card-desc">域账号实时验真；首次登入无感自动录入创建系统主账号。</div>
+        <div class="tag-row">
+          <span class="tag">Direct Bind 实时验真</span>
+          <span class="tag">首次登录自动建档</span>
+        </div>
+      </div>
+
+      <!-- 本地账号密码 -->
+      <div class="card">
+        <span class="badge-cyan">主认证 · 原生开箱</span>
+        <div class="card-title">系统原生账号密码</div>
+        <div class="card-desc">系统内置账号体系；管理员建号或自主注册，确定 username。</div>
+        <div class="tag-row">
+          <span class="tag">全局唯一 username</span>
+          <span class="tag">bcrypt 加盐哈希</span>
+        </div>
+      </div>
+
+      <!-- 飞书企业扫码 -->
+      <div class="card">
+        <span class="badge-nomfa">首次绑定 · 免 MFA</span>
+        <div class="card-title">飞书企业扫码 (OIDC)</div>
+        <div class="card-desc">首次需通过 LDAP/账密对齐绑定；绑定后扫码直通免二次 MFA。</div>
+        <div class="tag-row">
+          <span class="tag">首次需绑定主账号</span>
+          <span class="tag">绑定后扫码免密</span>
+        </div>
+      </div>
+
+      <!-- Passkey 免密 -->
+      <div class="card">
+        <span class="badge-nomfa">设备注册 · 免 MFA</span>
+        <div class="card-title">Passkey 生物免密</div>
+        <div class="card-desc">主账号内注册绑定硬件密钥，通过指纹/面容直通免 MFA。</div>
+        <div class="tag-row">
+          <span class="tag">FIDO2 / WebAuthn</span>
+          <span class="tag">硬件私钥免密</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 连接列 1 -> 2 -->
+    <div class="connector-col">
+      <div class="connector-arrow">➔</div>
+      <div class="connector-text">身份确认</div>
+    </div>
+
+    <!-- 第二列：JIT 即时预供流水线 -->
+    <div class="column-panel col-jit">
+      <div class="panel-header">
+        <span class="panel-title">2. JIT 即时自动化供应</span>
+        <span class="panel-sub">Provisioning Core</span>
+      </div>
+
+      <div class="jit-pipeline">
+        <div class="jit-step highlight">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">确立主账号与凭据绑定</div>
+            <div class="step-desc">LDAP 首次登入自动建号；飞书首次对齐绑定 username</div>
+          </div>
+        </div>
+
+        <div class="jit-step highlight">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">初始化个人独立租户</div>
+            <div class="step-desc">自动创建 "{username}-personal" 专属私有空间与 Membership</div>
+          </div>
+        </div>
+
+        <div class="jit-step highlight">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Casbin 授予租户超管</div>
+            <div class="step-desc">下发 g, u:user, r:admin, c:personal 规则，拥有本租户自治特权</div>
+          </div>
+        </div>
+
+        <div class="jit-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">挂载企业组织租户</div>
+            <div class="step-desc">按部门架构或管理员指派建立企业租户成员关系 (Member)</div>
+          </div>
+        </div>
+
+        <div class="jit-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title">推导活跃租户并登入</div>
+            <div class="step-desc">智能解析上次活跃空间，出具 Token 登录进入工作台</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 连接列 2 -> 3 -->
+    <div class="connector-col">
+      <div class="connector-arrow">➔</div>
+      <div class="connector-text">出具会话</div>
+    </div>
+
+    <!-- 第三列：双轨工作空间与隔离 -->
+    <div class="column-panel col-space">
+      <div class="panel-header">
+        <span class="panel-title">3. 双轨多租户隔离</span>
+        <span class="panel-sub">Dual Spaces</span>
+      </div>
+
+      <!-- 个人独立沙箱 -->
+      <div class="space-card space-personal">
+        <div class="space-header">
+          <span class="space-name">个人空间 (Personal)</span>
+          <span class="role-badge-admin">租户超管</span>
+        </div>
+        <div class="space-features">
+          <div class="feature-item">平台全功能免审批自主体验</div>
+          <div class="feature-item">个人私有自治空间，拥有租户级管理特权</div>
+          <div class="feature-item">私有沙箱隔离，安全试用不扰生产</div>
+        </div>
+      </div>
+
+      <!-- 企业协作租户 -->
+      <div class="space-card space-org">
+        <div class="space-header">
+          <span class="space-name">企业组织租户 (Org)</span>
+          <span class="role-badge-member">MEMBER 成员</span>
+        </div>
+        <div class="space-features">
+          <div class="feature-item">生产运维与多团队协作资源池</div>
+          <div class="feature-item">严格遵循企业 PBAC 细粒度授权</div>
+          <div class="feature-item">行级数据范围约束 (AccessScope)</div>
+        </div>
+      </div>
+
+      <!-- 租户切换说明 -->
+      <div class="card" style="margin-top: auto; padding: 7px 9px;">
+        <div class="card-desc" style="font-size: 10px; color: #94a3b8;">
+          <strong style="color: #cbd5e1;">活跃租户推导：</strong>记忆历史优先，个人空间兜底；支持顶部全局一键秒切。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 底部说明栏（轻量精炼） -->
+  <div class="footer-bar">
+    <div class="footer-item">
+      <span class="dot-blue"></span>
+      <span><strong>主认证源</strong>：LDAP 自动建档录入 · 本地账密开箱即用</span>
+    </div>
+    <div class="footer-item">
+      <span class="dot-green"></span>
+      <span><strong>第三方免密</strong>：飞书首次绑定主身份 · 后续扫码直通免 MFA</span>
+    </div>
+    <div class="footer-item">
+      <span class="dot-purple"></span>
+      <span><strong>双轨多租户</strong>：个人空间全功能自治体验 · 生产资源物理隔离</span>
+    </div>
+  </div>
+
+</body>
+
+</html>

@@ -45,3 +45,58 @@ html.dark .VPHero .image {
     display: table;
     width: 100%;
 }
+
+/* 彻底解决 Markdown 中 --- (hr) 与 h2/h3 自带顶部分割线重叠导致的双横线视觉问题 */
+.vp-doc hr {
+    display: none;
+}
+
+/* 首页原生特性卡片：上 2 下 3 布局 */
+@media (min-width: 768px) {
+
+    /* 前 2 个卡片：各占 50%，第一行并排铺满 */
+    .VPFeatures .item:nth-child(1),
+    .VPFeatures .item:nth-child(2) {
+        width: calc(100% / 2) !important;
+    }
+
+    /* 后 3 个卡片：各占 33.333%，第二行三等分铺满 */
+    .VPFeatures .item:nth-child(3),
+    .VPFeatures .item:nth-child(4),
+    .VPFeatures .item:nth-child(5) {
+        width: calc(100% / 3) !important;
+    }
+}
+
+/* Medium Zoom 全屏灯箱增强 */
+.vp-doc img:not(.no-zoom) {
+    cursor: zoom-in;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border-radius: 8px;
+}
+
+.vp-doc img:not(.no-zoom):hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.medium-zoom-overlay {
+    z-index: 1000 !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.medium-zoom-image--opened {
+    z-index: 1001 !important;
+    cursor: zoom-out !important;
+}
+
+/* 确保 Mermaid 复杂图表在窄屏下支持横向平滑滚动，绝不压缩文字 */
+.vp-doc .mermaid {
+    overflow-x: auto;
+}
+
+/* 表格第一列保持不折行，保障阶段与标题列紧凑对齐 */
+.vp-doc table td:first-child,
+.vp-doc table th:first-child {
+    white-space: nowrap;
+}
