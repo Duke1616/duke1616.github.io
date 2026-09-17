@@ -27,5 +27,6 @@ dist-ssr
 docs/.vitepress/dist
 docs/.vitepress/cache
 
-# Local demo tools & outputs
-tools/
+# Local demo tools & outputs (only ignore compiled binaries, not source)
+tools/capture-demo/capture-demo
+tools/capture-demo/*.exe
