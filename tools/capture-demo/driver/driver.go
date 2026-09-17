@@ -29,7 +29,8 @@ type Driver struct {
 	AllocCtx    context.Context
 	AllocCancel context.CancelFunc
 	Opts        Options
-	newTargetCh chan target.ID // 监听新 Tab 弹出
+	GlobalMasks map[string]string  // 全局脱敏词典，在每次 Capture 截图前自动全量应用
+	newTargetCh chan target.ID     // 监听新 Tab 弹出
 }
 
 // New 创建并初始化驱动器，启动 Headless Chrome
@@ -46,6 +47,7 @@ func New(opts Options) (*Driver, error) {
 		AllocCtx:    allocCtx,
 		AllocCancel: allocCancel,
 		Opts:        opts,
+		GlobalMasks: make(map[string]string),
 		newTargetCh: make(chan target.ID, 10),
 	}
 
@@ -68,6 +70,16 @@ func New(opts Options) (*Driver, error) {
 	return d, nil
 }
 
+// SetGlobalMasks 配置全局脱敏字典（截屏前自动全量替换）
+func (d *Driver) SetGlobalMasks(masks map[string]string) {
+	if d.GlobalMasks == nil {
+		d.GlobalMasks = make(map[string]string)
+	}
+	for k, v := range masks {
+		d.GlobalMasks[k] = v
+	}
+}
+
 // Close 释放浏览器进程及所有相关资源
 func (d *Driver) Close() {
 	if d.Cancel != nil {
@@ -86,16 +98,28 @@ func (d *Driver) WaitForPopup(trigger func() error) (*Driver, error) {
 
 	select {
 	case targetID := <-d.newTargetCh:
-		popupCtx, cancel := chromedp.NewContext(d.AllocCtx, chromedp.WithTargetID(targetID))
+		// 创建新 Tab 的 context，必须立即加 timeout，否则 target 可能断开
+		popupCtx, popupCancel := chromedp.NewContext(d.AllocCtx, chromedp.WithTargetID(targetID))
+		timeoutCtx, timeoutCancel := context.WithTimeout(popupCtx, d.Opts.Timeout)
+
+		// 立即激活连接：chromedp.NewContext 是懒初始化，必须运行一个命令才真正建立 WS 连接
+		var title string
+		if runErr := chromedp.Run(timeoutCtx, chromedp.Title(&title)); runErr != nil {
+			timeoutCancel()
+			popupCancel()
+			return nil, fmt.Errorf("新 Tab 连接失败: %w", runErr)
+		}
+
 		popup := &Driver{
-			Ctx:         popupCtx,
-			Cancel:      cancel,
+			Ctx:         timeoutCtx,
+			Cancel:      func() { timeoutCancel(); popupCancel() },
 			AllocCtx:    d.AllocCtx,
 			AllocCancel: func() {}, // 共享 AllocContext，不单独 Cancel
 			Opts:        d.Opts,
+			GlobalMasks: d.GlobalMasks, // 继承父窗口的全局脱敏规则
 			newTargetCh: make(chan target.ID, 5),
 		}
-		_ = chromedp.Run(popupCtx,
+		_ = chromedp.Run(timeoutCtx,
 			emulation.SetDeviceMetricsOverride(d.Opts.WindowWidth, d.Opts.WindowHeight, d.Opts.DPR, false),
 		)
 		_ = popup.InjectCleanStyles()

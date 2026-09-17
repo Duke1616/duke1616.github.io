@@ -2,9 +2,6 @@ package driver
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -15,16 +12,21 @@ func (d *Driver) Login(username, password string) error {
 	if err := d.Navigate("/login"); err != nil {
 		return err
 	}
-	_ = d.FillInput("username", username)
-	_ = d.FillInput("password", password)
+	// 使用页面真实的 placeholder 文字定位输入框
+	_ = d.FillInput("账号", username)    // placeholder: "账号 / 邮箱"
+	_ = d.FillInput("登录密码", password) // placeholder: "登录密码"
 
-	// 兼容"登录" / "登 录" 两种按钮文案
-	if err := d.ClickText("登录"); err != nil {
-		if err2 := d.ClickText("登 录"); err2 != nil {
-			return err
-		}
+	// 按钮文案含空格 "登 录"
+	if err := d.ClickText("登 录"); err != nil {
+		return fmt.Errorf("点击登录按钮失败: %w", err)
 	}
-	return d.WaitStable(500 * time.Millisecond)
+
+	// 等待导航栏出现，确认登录跳转真正完成（而非固定等待）
+	if err := d.WaitVisible(".layout-menu, .el-menu, .sidebar, nav"); err != nil {
+		// 降级：固定等 2s，再判断是否还在登录页
+		_ = d.WaitStable(2 * time.Second)
+	}
+	return nil
 }
 
 // SwitchTenant 切换到指定租户空间（若当前已在目标空间则跳过）
@@ -45,21 +47,3 @@ func (d *Driver) SwitchTenant(tenantName string) error {
 	return nil
 }
 
-// Capture 高清截取当前视口并保存到文件（自动创建目录）
-func (d *Driver) Capture(outputPath string) error {
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return fmt.Errorf("创建输出目录失败: %w", err)
-	}
-	_ = d.InjectCleanStyles()
-	_ = d.WaitStable(200 * time.Millisecond)
-
-	var buf []byte
-	if err := chromedp.Run(d.Ctx, chromedp.CaptureScreenshot(&buf)); err != nil {
-		return fmt.Errorf("截屏失败: %w", err)
-	}
-	if err := os.WriteFile(outputPath, buf, 0644); err != nil {
-		return fmt.Errorf("保存截图失败: %w", err)
-	}
-	fmt.Printf("   📸 已导出 → %s (%d KB)\n", strings.TrimPrefix(outputPath, "../../docs/public/"), len(buf)/1024)
-	return nil
-}

@@ -83,52 +83,66 @@ func (c *runContext) switchToPopup(popup *driver.Driver) {
 func (c *runContext) dispatch(a scenarios.Action) error {
 	switch a.Type {
 
-	case scenarios.Navigate:
+	case scenarios.ActionNavigate:
 		fmt.Printf("   → 导航: %s\n", a.Path)
+		// 如果当前在 popup 窗口，Navigate 意味着要回到主窗口
+		if c.popup != nil {
+			c.cleanup()
+		}
 		return c.active.Navigate(a.Path)
 
-	case scenarios.ClickText:
+	case scenarios.ActionClickText:
 		return c.handleClick(a, func() error { return c.active.ClickText(a.Text) })
 
-	case scenarios.ClickSelector:
+	case scenarios.ActionClickInPlace:
+		// 拦截 window.open，在当前 Tab 内导航而非弹出新 Tab
+		label := lo.Ternary(a.Text != "", a.Text, a.Selector)
+		fmt.Printf("   → 就地点击（拦截弹窗）: %s\n", label)
+		return c.active.ClickTextInPlace(a.Text)
+
+	case scenarios.ActionClickSelector:
 		// 选择器不存在时静默跳过（如拓扑居中按钮）
 		return c.handleClick(a, func() error { return c.active.ClickSelector(a.Selector) })
 
-	case scenarios.WaitVisible:
+	case scenarios.ActionWaitVisible:
 		fmt.Printf("   → 等待: %s\n", a.Selector)
 		return c.active.WaitVisible(a.Selector)
 
-	case scenarios.Fill:
+	case scenarios.ActionFillInput:
 		fmt.Printf("   → 填写 [%s] = %q\n", a.Field, a.Value)
 		return c.active.FillInput(a.Field, a.Value)
 
-	case scenarios.FillBySelector:
+	case scenarios.ActionFillBySelector:
 		fmt.Printf("   → 填写 [%s] = %q\n", a.Selector, a.Value)
 		return c.active.FillBySelector(a.Selector, a.Value)
 
-	case scenarios.SelectOption:
+	case scenarios.ActionSelectOpt:
 		fmt.Printf("   → 下拉 [%s] → %q\n", a.Field, a.Value)
 		return c.active.SelectOption(a.Field, a.Value)
 
-	case scenarios.Submit:
+	case scenarios.ActionSubmitBtn:
 		return c.handleSubmit(a)
 
-	case scenarios.WaitToast:
+	case scenarios.ActionWaitToast:
 		fmt.Printf("   → 等待 Toast\n")
 		return c.active.WaitToast(5 * time.Second)
 
-	case scenarios.Mask:
+	case scenarios.ActionMaskText:
 		fmt.Printf("   → 脱敏（%d 条）\n", len(a.Masks))
 		return c.active.MaskText(a.Masks)
 
-	case scenarios.Sleep:
+	case scenarios.ActionSleepWait:
 		fmt.Printf("   → 等待 %d ms\n", a.Ms)
 		time.Sleep(time.Duration(a.Ms) * time.Millisecond)
 		return nil
 
-	case scenarios.Scroll:
+	case scenarios.ActionScrollTo:
 		fmt.Printf("   → 滚动到: %s\n", a.Selector)
 		return c.active.ScrollIntoView(a.Selector)
+
+	case scenarios.ActionHoverText:
+		fmt.Printf("   → 悬停: %s\n", a.Text)
+		return c.active.Hover(a.Text)
 
 	default:
 		return fmt.Errorf("未知动作类型: %s", a.Type)
@@ -143,7 +157,7 @@ func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error
 
 	if !a.InPopup {
 		err := clickFn()
-		if err != nil && a.Type == scenarios.ClickSelector {
+		if err != nil && a.Type == scenarios.ActionClickSelector {
 			return nil // ClickSelector：元素不存在时静默跳过
 		}
 		return err
@@ -152,7 +166,7 @@ func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error
 	// InPopup：等待新 Tab 弹出后切换上下文
 	popup, err := c.main.WaitForPopup(clickFn)
 	if err != nil {
-		if a.Type == scenarios.ClickSelector {
+		if a.Type == scenarios.ActionClickSelector {
 			fmt.Printf("   → 新 Tab 未弹出，继续当前窗口\n")
 			return nil
 		}
