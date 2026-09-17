@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
+	"github.com/samber/lo"
 )
 
 // ── 内嵌 JavaScript 片段 ────────────────────────────────────────────────────
@@ -287,11 +288,9 @@ func quote(s string) string {
 
 // marshalMasks 将 Go map 序列化为 JS 对象字面量
 func marshalMasks(masks map[string]string) string {
-	var b strings.Builder
-	b.WriteString("{")
-	for k, v := range masks {
-		b.WriteString(fmt.Sprintf("%q:%q,", k, v))
-	}
-	b.WriteString("}")
-	return b.String()
+	// lo.Entries 将 map 转为 [{Key, Value}] 切片，顺序稳定地序列化每个键值对
+	pairs := lo.Map(lo.Entries(masks), func(e lo.Entry[string, string], _ int) string {
+		return fmt.Sprintf("%q:%q", e.Key, e.Value)
+	})
+	return "{" + strings.Join(pairs, ",") + "}"
 }

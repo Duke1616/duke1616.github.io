@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 )
 
 // Run 执行一个完整的 Scenario
@@ -135,7 +137,8 @@ func (c *runContext) dispatch(a scenarios.Action) error {
 
 // handleClick 统一处理点击动作，含 InPopup 切换逻辑
 func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error {
-	label := cond(a.Text != "", a.Text, a.Selector)
+	// lo.Ternary: InPopup=false 时用 Text，否则用 Selector 作为日志标识
+	label := lo.Ternary(a.Text != "", a.Text, a.Selector)
 	fmt.Printf("   → 点击: %s\n", label)
 
 	if !a.InPopup {
@@ -179,11 +182,3 @@ func (c *runContext) handleSubmit(a scenarios.Action) error {
 // ── 工具函数 ───────────────────────────────────────────────────────────────
 
 func divider() string { return strings.Repeat("─", 56) }
-
-// cond 三元表达式替代（Go 没有三目运算符）
-func cond(ok bool, a, b string) string {
-	if ok {
-		return a
-	}
-	return b
-}
