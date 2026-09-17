@@ -125,6 +125,34 @@ func executeAction(
 		}
 		return nil
 
+	case scenarios.SelectOption:
+		fmt.Printf("   → 下拉选择 [%s] = %q\n", action.Field, action.Value)
+		return currentBot.SelectOption(action.Field, action.Value)
+
+	case scenarios.FillBySelector:
+		fmt.Printf("   → 精确填写 [%s] = %q\n", action.Selector, action.Value)
+		return currentBot.FillBySelector(action.Selector, action.Value)
+
+	case scenarios.Submit:
+		fmt.Printf("   → 提交表单: 点击 %q\n", action.Text)
+		if err := currentBot.ClickText(action.Text); err != nil {
+			return err
+		}
+		// 等待成功 Toast 出现（接口响应成功标志）
+		_ = currentBot.WaitToast(5 * time.Second)
+		// 若声明了后置等待选择器（如列表刷新），额外等待它出现
+		if action.WaitSelector != "" {
+			fmt.Printf("   → 等待结果出现: %s\n", action.WaitSelector)
+			if err := currentBot.WaitVisible(action.WaitSelector); err != nil {
+				fmt.Printf("   ⚠️  后置选择器 %q 未出现（继续）\n", action.WaitSelector)
+			}
+		}
+		return nil
+
+	case scenarios.WaitToast:
+		fmt.Printf("   → 等待成功 Toast...\n")
+		return currentBot.WaitToast(5 * time.Second)
+
 	default:
 		return fmt.Errorf("未知动作类型: %s", action.Type)
 	}

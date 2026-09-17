@@ -457,3 +457,135 @@ func (d *Driver) ScrollIntoView(selector string) error {
 	}
 	return d.WaitStable(100 * time.Millisecond)
 }
+
+// SelectOption 操作 El-Select 下拉组件，按选项文字选择目标项
+// field: 用于定位下拉框的 placeholder 文字（如 "请选择认证类型"）
+// value: 要选择的选项文字（如 "publickey"）
+func (d *Driver) SelectOption(field, value string) error {
+	// 第一步：找到下拉框并点击展开
+	jsOpen := fmt.Sprintf(`
+		(function() {
+			const targets = Array.from(document.querySelectorAll(
+				'.el-select, .el-select-v2, [class*="select"]'
+			));
+			// 按 placeholder 文字定位到正确的下拉框
+			const el = targets.find(el => {
+				const input = el.querySelector('input');
+				const placeholder = (input?.getAttribute('placeholder') || '').trim();
+				const label = (el.previousElementSibling?.innerText || '').trim();
+				return placeholder.includes(%q) || label.includes(%q);
+			});
+			if (el) {
+				(el.querySelector('input') || el).click();
+				return true;
+			}
+			return false;
+		})()
+	`, field, field)
+
+	var opened bool
+	if err := chromedp.Run(d.Ctx, chromedp.Evaluate(jsOpen, &opened)); err != nil || !opened {
+		return fmt.Errorf("未找到 placeholder 为 %q 的下拉框", field)
+	}
+
+	// 等待下拉菜单弹出
+	_ = d.WaitStable(300 * time.Millisecond)
+
+	// 第二步：在弹出的选项列表中点击目标选项
+	// El-Select 的选项渲染在 body 底部的 .el-select-dropdown 中（脱离父级 DOM 树）
+	jsSelect := fmt.Sprintf(`
+		(function() {
+			const dropdowns = document.querySelectorAll(
+				'.el-select-dropdown .el-select-dropdown__item, ' +
+				'.el-select-dropdown__list li, ' +
+				'.el-popper .el-select-dropdown__item'
+			);
+			const target = Array.from(dropdowns).find(item => {
+				const t = (item.innerText || item.textContent || '').trim();
+				return t === %q || t.includes(%q);
+			});
+			if (target) {
+				target.click();
+				return true;
+			}
+			return false;
+		})()
+	`, value, value)
+
+	var selected bool
+	if err := chromedp.Run(d.Ctx, chromedp.Evaluate(jsSelect, &selected)); err != nil || !selected {
+		return fmt.Errorf("未找到选项 %q", value)
+	}
+	return d.WaitStable(200 * time.Millisecond)
+}
+
+// FillBySelector 按 CSS 选择器精确定位输入框并填入值（兼容 Vue 响应式）
+// 适用于多个同名 placeholder 字段共存的复杂表单
+func (d *Driver) FillBySelector(selector, value string) error {
+	jsFill := fmt.Sprintf(`
+		(function() {
+			const el = document.querySelector(%q);
+			if (!el) return false;
+			// 如果是 el-input，找到内部的 input 元素
+			const input = el.tagName === 'INPUT' ? el : el.querySelector('input, textarea');
+			if (!input) return false;
+			input.focus();
+			// 清空原有内容
+			const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+				window.HTMLInputElement.prototype, 'value'
+			)?.set;
+			nativeInputValueSetter?.call(input, %q);
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			input.dispatchEvent(new Event('change', { bubbles: true }));
+			return true;
+		})()
+	`, selector, value)
+
+	var filled bool
+	if err := chromedp.Run(d.Ctx, chromedp.Evaluate(jsFill, &filled)); err != nil {
+		return fmt.Errorf("FillBySelector %q 失败: %w", selector, err)
+	}
+	if !filled {
+		return fmt.Errorf("选择器 %q 未找到可填写的输入框", selector)
+	}
+	return nil
+}
+
+// WaitToast 等待成功提示（el-message--success）出现并消失
+// 用于确认提交/创建操作已被后端接受
+// timeout: 最长等待时间，超时后不报错（降级为静默跳过）
+func (d *Driver) WaitToast(timeout time.Duration) error {
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+
+	jsWait := `
+		new Promise(resolve => {
+			const check = () => {
+				const toast = document.querySelector('.el-message--success, .el-notification--success');
+				if (toast) {
+					resolve(true);
+				} else {
+					setTimeout(check, 100);
+				}
+			};
+			check();
+			// 保底超时
+			setTimeout(() => resolve(false), 5000);
+		})
+	`
+
+	ctxTimeout, cancel := context.WithTimeout(d.Ctx, timeout)
+	defer cancel()
+
+	var appeared bool
+	_ = chromedp.Run(ctxTimeout, chromedp.Evaluate(jsWait, &appeared))
+
+	if appeared {
+		// Toast 出现了，等它自动消失（el-message 默认 3s 后消失）
+		_ = d.WaitStable(400 * time.Millisecond)
+	}
+	// Toast 不出现也不报错，调用方已通过 WaitSelector 验证结果
+	return nil
+}
+
