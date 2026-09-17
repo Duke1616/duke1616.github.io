@@ -122,8 +122,3 @@ tasks:
     cmds:
       - go run ./cmd/swaggergen
 ```
-
----
-
-> [!TIP]
-> 掌握了鉴权、多租户、单点登录与工具链体系后，若需了解系统在生产环境的落地，请参阅 [生产部署与高可用指南](/system/deploy)。

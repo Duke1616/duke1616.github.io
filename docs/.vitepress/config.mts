@@ -31,7 +31,6 @@ export default withMermaid(defineConfig({
       { text: '资产管理', link: '/cmdb/concept' },
       { text: '工单中心', link: '/workflow/concept' },
       { text: '任务中心', link: '/task/architecture' },
-      { text: '系统运维', link: '/system/deploy' },
       { text: '演示环境', link: 'http://www.fleetops.top/' }
     ],
 
@@ -135,13 +134,6 @@ export default withMermaid(defineConfig({
           { text: '异构执行引擎与 SDK', link: '/task/engine' },
           { text: 'Ansible 凭据与互信', link: '/task/ansible-credential' },
           { text: '运行模式与配置实战', link: '/task/startup' }
-        ]
-      },
-      {
-        text: '系统运维',
-        collapsed: false,
-        items: [
-          { text: '生产部署与高可用', link: '/system/deploy' }
         ]
       }
     ],
