@@ -4,6 +4,7 @@ import { useRoute } from 'vitepress'
 import mediumZoom from 'medium-zoom'
 import './style.css'
 import ContactQR from './components/ContactQR.vue'
+import DocStepFlow from './components/DocStepFlow.vue'
 
 export default {
     extends: DefaultTheme,
@@ -11,6 +12,9 @@ export default {
         return h(DefaultTheme.Layout, null, {
             'nav-bar-content-after': () => h(ContactQR)
         })
+    },
+    enhanceApp({ app }: { app: any }) {
+        app.component('DocStepFlow', DocStepFlow)
     },
     setup() {
         const route = useRoute()

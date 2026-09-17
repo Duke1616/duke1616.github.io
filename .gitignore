@@ -26,3 +26,6 @@ dist-ssr
 # VitePress specific
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+# Local demo tools & outputs
+tools/

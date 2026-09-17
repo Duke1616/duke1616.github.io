@@ -124,5 +124,56 @@ ECMDB 插件体系并非专为特定运维工具定制，而是一套**吸引开
 
 ---
 
+## 5. 实操演练：插件注册、模型绑定与终端流转全景
+
+为了让您更直观地理解插件体系在实际生产中的运作方式，以下展示从**插件微服务中心注册**、**模型拓扑绑定**到**资产列表操作**、**全双工在线终端建立**的真实操作全景。
+
+您可以通过下方的**交互式演练视窗**总览全流程（支持平滑自动演示与步骤切换，点击画面任意处可进入全屏画廊并支持键盘左右方向键连续浏览）：
+
+<script setup>
+const pluginSteps = [
+  {
+    title: '插件拓扑自省',
+    tag: '控制面协同',
+    url: 'fleetops.top/cmdb/plugins/builtin.ssh',
+    image: '/images/plugin/01-plugin-center.png'
+  },
+  {
+    title: '动作能力描述',
+    tag: '契约协商',
+    url: 'fleetops.top/cmdb/plugins/builtin.ssh?tab=actions',
+    image: '/images/plugin/02-plugin-actions.png'
+  },
+  {
+    title: '资产列表注入',
+    tag: '微前端解耦',
+    url: 'fleetops.top/cmdb/resources/host',
+    image: '/images/plugin/03-resource-actions.png'
+  },
+  {
+    title: '独立运维视窗',
+    tag: '运行时隔离',
+    url: 'fleetops.top/cmdb/plugin-runtime?action=select&id=3',
+    image: '/images/plugin/04-runtime-select.png'
+  },
+  {
+    title: '极客命令行终端',
+    tag: '数据面直连',
+    url: 'fleetops.top/cmdb/plugin-runtime?action=terminal&id=3',
+    image: '/images/plugin/05-terminal-session.png'
+  },
+  {
+    title: 'SFTP 远程工作台',
+    tag: '多协议复用',
+    url: 'fleetops.top/cmdb/plugin-runtime?action=sftp&id=3',
+    image: '/images/plugin/06-sftp-workspace.png'
+  }
+]
+</script>
+
+<DocStepFlow :steps="pluginSteps" />
+
+---
+
 > [!TIP]
 > 想要为您的团队开发一个专属的运维插件？请查阅专篇实战指南：[插件契约与模型注入](/cmdb/plugin-dev)，了解如何仅凭一个结构体即可实现模型自动创建、已有字段别名映射与拓扑注入。

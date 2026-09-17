@@ -5,6 +5,12 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 export default withMermaid(defineConfig({
   title: "ECMDB",
   description: "企业级 CMDB、智能工单、自动化告警与分布式任务一体化平台",
+  markdown: {
+    config(md) {
+      md.renderer.rules.table_open = () => '<div class="vp-table-wrap"><table tabindex="0">\n'
+      md.renderer.rules.table_close = () => '</table></div>\n'
+    }
+  },
   themeConfig: {
     logo: '/logo-icon.png',
 

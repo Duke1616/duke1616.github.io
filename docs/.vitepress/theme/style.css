@@ -40,10 +40,84 @@ html.dark .VPHero .image {
     filter: drop-shadow(0 10px 30px rgba(83, 148, 244, 0.2)) drop-shadow(0 0 100px rgba(114, 206, 207, 0.3));
 }
 
-/* 让文档中的表格自动铺满宽度 */
-.vp-doc table {
-    display: table;
+/* ===================================================
+   VitePress 表格全响应式架构：外层包裹容器 + 内层表格
+   =================================================== */
+
+/* 外层滚动容器：负责横向滚动、圆角与平滑手势 */
+.vp-table-wrap {
     width: 100%;
+    margin: 20px 0 24px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 8px;
+    background-color: var(--vp-c-bg);
+}
+
+/* 细滚动条指示 */
+.vp-table-wrap::-webkit-scrollbar {
+    height: 5px;
+}
+
+.vp-table-wrap::-webkit-scrollbar-thumb {
+    background: var(--vp-c-divider);
+    border-radius: 4px;
+}
+
+/* 内层表格：始终保持标准 table 布局并铺满容器 */
+.vp-table-wrap table {
+    display: table !important;
+    width: 100% !important;
+    min-width: 520px;
+    margin: 0 !important;
+    border-collapse: collapse;
+    border: none !important;
+}
+
+/* 桌面端大屏：完全自适应充满整行且首列不折行 */
+@media (min-width: 769px) {
+    .vp-table-wrap table {
+        min-width: 100%;
+    }
+
+    .vp-table-wrap table td:first-child,
+    .vp-table-wrap table th:first-child {
+        white-space: nowrap;
+    }
+}
+
+/* 移动端：首列冻结吸附（Sticky Column），滑动时字段对照始终可见 */
+@media (max-width: 768px) {
+
+    .vp-table-wrap table th,
+    .vp-table-wrap table td {
+        padding: 10px 14px;
+        font-size: 13.5px;
+        line-height: 1.6;
+        word-break: break-word;
+    }
+
+    .vp-table-wrap table th:first-child,
+    .vp-table-wrap table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        min-width: 96px;
+        max-width: 140px;
+        white-space: normal;
+        background-color: var(--vp-c-bg);
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .vp-table-wrap table tr:nth-child(2n) td:first-child {
+        background-color: var(--vp-c-bg-soft);
+    }
+
+    html.dark .vp-table-wrap table th:first-child,
+    html.dark .vp-table-wrap table td:first-child {
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.35);
+    }
 }
 
 /* 彻底解决 Markdown 中 --- (hr) 与 h2/h3 自带顶部分割线重叠导致的双横线视觉问题 */
@@ -95,8 +169,58 @@ html.dark .VPHero .image {
     overflow-x: auto;
 }
 
-/* 表格第一列保持不折行，保障阶段与标题列紧凑对齐 */
-.vp-doc table td:first-child,
-.vp-doc table th:first-child {
-    white-space: nowrap;
+
+
+/* 实机截图展示容器卡片 */
+.demo-shot-card {
+    margin: 20px 0 28px;
+    background: var(--vp-c-bg-soft);
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.demo-shot-card:hover {
+    border-color: var(--vp-c-brand-1);
+    box-shadow: 0 8px 24px rgba(30, 102, 245, 0.12);
+}
+
+.demo-shot-card img {
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+    border: 1px solid var(--vp-c-divider);
+}
+
+.demo-shot-caption {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--vp-c-text-2);
+}
+
+/* ===================================================
+   Fancybox 全屏专业画廊深度样式调优 (零透光与纯粹全屏视窗)
+   =================================================== */
+.fancybox__dialog {
+    background: rgba(10, 14, 23, 0.98) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    z-index: 999999 !important;
+}
+
+.fancybox__backdrop {
+    background: rgba(10, 14, 23, 0.98) !important;
+}
+
+.fancybox__slide {
+    padding: 32px 48px !important;
+}
+
+.fancybox__slide img {
+    border-radius: 8px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7) !important;
 }
