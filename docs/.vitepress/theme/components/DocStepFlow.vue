@@ -72,9 +72,15 @@ const togglePlay = () => {
 }
 
 onMounted(async () => {
-  // NOTE: 客户端动态按需加载专业画廊库 Fancybox，接管所有步骤的全屏高清放大与连续翻页
+  // 客户端动态按需加载专业画廊库 Fancybox，接管所有步骤的全屏高清放大与连续翻页
   const { Fancybox } = await import('@fancyapps/ui')
+  let savedScrollY = 0
+
   Fancybox.bind('[data-fancybox="doc-steps"]', {
+    // 禁用 Hash 插件，杜绝其在关闭时执行 history.back() 触发 VitePress 路由重置滚回顶部
+    Hash: false,
+    // 禁用关闭时强制对焦 triggerEl 避免触发浏览器的 scrollIntoView 导致画面跳变
+    placeFocusBack: false,
     Carousel: {
       Thumbs: {
         showOnStart: false
@@ -89,12 +95,18 @@ onMounted(async () => {
     },
     on: {
       init: () => {
+        // 记录打开画廊前的精确滚动位置
+        savedScrollY = window.scrollY
         swiperInstance.value?.autoplay.stop()
       },
       close: () => {
         if (isPlaying.value) {
           swiperInstance.value?.autoplay.start()
         }
+        // 双重保障：确保画廊关闭后页面坚挺停留在原阅读位置
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: savedScrollY, behavior: 'instant' })
+        })
       },
       'Carousel.change': (_fancybox: any, _carousel: any, to: number) => {
         swiperInstance.value?.slideTo(to)
