@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ETask Architecture</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #0b0f19;
+      color: #e6edf3;
+      width: 1120px;
+      height: 620px;
+      padding: 20px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1a2234;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 18.5px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      font-size: 11.5px;
+      color: #8b9bb4;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      color: #58a6ff;
+      background: rgba(56, 166, 255, 0.12);
+      border: 1px solid rgba(56, 166, 255, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 架构主容器 */
+    .arch-container {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      flex: 1;
+      justify-content: space-between;
+      margin: 9px 0 0 0;
+    }
+
+    /* 面板通用 (三层微渐变卡片) */
+    .panel {
+      border-radius: 8px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid #1e2638;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .panel.control-panel {
+      border-color: rgba(56, 139, 253, 0.32);
+      background: linear-gradient(180deg, rgba(56, 139, 253, 0.05) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    .panel.channel-panel {
+      border-color: rgba(240, 136, 62, 0.32);
+      background: linear-gradient(180deg, rgba(240, 136, 62, 0.05) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    .panel.exec-panel {
+      border-color: rgba(63, 185, 80, 0.32);
+      background: linear-gradient(180deg, rgba(63, 185, 80, 0.05) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .panel-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .panel-title.blue {
+      color: #58a6ff;
+    }
+
+    .panel-title.orange {
+      color: #f0883e;
+    }
+
+    .panel-title.green {
+      color: #3fb950;
+    }
+
+    .panel-sub {
+      font-size: 11px;
+      color: #8b9bb4;
+    }
+
+    /* 网格行 */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 10px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+      align-items: stretch;
+    }
+
+    /* 子卡片通用 */
+    .card {
+      background: #101522;
+      border: 1px solid #1e2638;
+      border-radius: 6px;
+      padding: 9px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .card.blue {
+      border-top: 2px solid #58a6ff;
+      box-shadow: 0 -2px 10px rgba(56, 166, 255, 0.18);
+    }
+
+    .card.purple {
+      border-top: 2px solid #bc8cff;
+      box-shadow: 0 -2px 10px rgba(188, 140, 255, 0.18);
+    }
+
+    .card.green {
+      border-top: 2px solid #3fb950;
+      box-shadow: 0 -2px 10px rgba(63, 185, 80, 0.18);
+    }
+
+    .card.orange {
+      border-top: 2px solid #f0883e;
+      box-shadow: 0 -2px 10px rgba(240, 136, 62, 0.18);
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #1a2234;
+    }
+
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      font-size: 10px;
+      color: #8b9bb4;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1px 7px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .badge.orange {
+      color: #f0883e;
+      background: rgba(240, 136, 62, 0.12);
+      border-color: rgba(240, 136, 62, 0.28);
+    }
+
+    .badge.blue {
+      color: #58a6ff;
+      background: rgba(56, 166, 255, 0.12);
+      border-color: rgba(56, 166, 255, 0.28);
+    }
+
+    .badge.purple {
+      color: #bc8cff;
+      background: rgba(188, 140, 255, 0.12);
+      border-color: rgba(188, 140, 255, 0.28);
+    }
+
+    /* 列表项 */
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .list-item {
+      font-size: 11px;
+      color: #9aa5b5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .list-item b {
+      color: #e6edf3;
+      font-weight: 600;
+    }
+
+    /* 发光小圆点 (Glow Dots) */
+    .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot.blue {
+      background: #58a6ff;
+      box-shadow: 0 0 6px rgba(88, 166, 255, 0.7);
+    }
+
+    .dot.purple {
+      background: #bc8cff;
+      box-shadow: 0 0 6px rgba(188, 140, 255, 0.7);
+    }
+
+    .dot.green {
+      background: #3fb950;
+      box-shadow: 0 0 6px rgba(63, 185, 80, 0.7);
+    }
+
+    .dot.orange {
+      background: #f0883e;
+      box-shadow: 0 0 6px rgba(240, 136, 62, 0.7);
+    }
+
+    /* gRPC 内部双子块对比 */
+    .sub-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .sub-box {
+      background: #0d121c;
+      border: 1px solid #1a2234;
+      border-radius: 4px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .sub-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 1px;
+    }
+
+    /* 流转提示条 */
+    .flow-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      height: 8px;
+    }
+
+    .flow-line {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #21293a, #388bfd, #21293a, transparent);
+    }
+
+    .flow-text {
+      position: absolute;
+      background: #0b0f19;
+      border: 1px solid #283347;
+      border-radius: 10px;
+      padding: 0 16px;
+      font-size: 10.5px;
+      color: #8b9bb4;
+      line-height: 16px;
+      letter-spacing: 0.2px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 顶部标题 -->
+  <div class="header">
+    <div class="title-left">
+      <div class="title">ETask 分布式任务调度与异步执行引擎</div>
+      <div class="subtitle">控制面与执行面完全解耦 · Kafka 与 gRPC 两种分发模式 · 统一 ExecutionRuntime 运行时</div>
+    </div>
+    <div class="header-badge">Clean Architecture</div>
+  </div>
+
+  <div class="arch-container">
+
+    <!-- 1. 控制面：触发、调度与治理 -->
+    <div class="panel control-panel">
+      <div class="panel-header">
+        <span class="panel-title blue">调度中心控制面 (Scheduler Plane)</span>
+        <span class="panel-sub">单一二进制 · 启动参数 --mode scheduler</span>
+      </div>
+      <div class="grid-3">
+        <!-- Codebook & AI 智能体 -->
+        <div class="card blue">
+          <div class="card-head">
+            <span class="card-title"><span class="dot blue"></span>脚本工程与 AI 助手</span>
+            <span class="badge">Codebook & AI</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot blue"></span><b>脚本工程化管理</b>：多文件工程打包，代码依赖版本化</div>
+            <div class="list-item"><span class="dot blue"></span><b>AI CodeAssist</b>：内嵌 Agent、Skill 与工具调用辅助编排</div>
+            <div class="list-item"><span class="dot blue"></span><b>敏感凭据加解密</b>：环境变量与凭据采用 AES-256 GCM 保护</div>
+          </div>
+        </div>
+
+        <!-- 多租户算力池与调度决策 -->
+        <div class="card purple">
+          <div class="card-head">
+            <span class="card-title"><span class="dot purple"></span>多租户算力池与智能路由</span>
+            <span class="badge">Pool & Dispatcher</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot purple"></span><b>多租户算力隔离</b>：SHARED 共享池与 DEDICATED 租户独占</div>
+            <div class="list-item"><span class="dot purple"></span><b>智能路由 (Picker)</b>：节点标签、实时负载与能力动态优选</div>
+            <div class="list-item"><span class="dot purple"></span><b>集群 RSA 动态鉴权</b>：Redis 原子生成密钥对，动态自愈验签</div>
+          </div>
+        </div>
+
+        <!-- 四维故障自愈补偿矩阵 -->
+        <div class="card green">
+          <div class="card-head">
+            <span class="card-title"><span class="dot green"></span>四维故障自愈补偿矩阵</span>
+            <span class="badge">Compensator & Resilience</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot green"></span><b>失联重调度 (Reschedule)</b>：节点故障失联主动转移与死信重试</div>
+            <div class="list-item"><span class="dot green"></span><b>卡滞中断 (Interrupt)</b>：心跳超时未推进自动感知并中断清理</div>
+            <div class="list-item"><span class="dot green"></span><b>秒级主动终止 (Termination)</b>：Outbox 广播强杀与终态强制收敛</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 流转提示分割 1 -->
+    <div class="flow-bar">
+      <div class="flow-line"></div>
+      <div class="flow-text">核心传输通道：Kafka 异步解耦 vs gRPC 直连/长轮询通道</div>
+    </div>
+
+    <!-- 2. 中部两种分发模式 -->
+    <div class="panel channel-panel">
+      <div class="panel-header">
+        <span class="panel-title orange">两种接入与分发模式 (Distribution Modes)</span>
+        <span class="panel-sub">隔离区单向 Kafka 异步通道 · 内网 gRPC PUSH 与 PULL 机制</span>
+      </div>
+      <div class="grid-2">
+        <!-- 模式 1: Kafka 模式 -->
+        <div class="card orange">
+          <div class="card-head">
+            <span class="card-title"><span class="dot orange"></span>模式 ① · Kafka 异步接入</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge orange">--mode agent</span>
+              <span class="badge" style="color: #f0883e;">DMZ 隔离区 / 边缘网络</span>
+            </div>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot orange"></span><b>传输链路</b>：调度端 ──► [Kafka Topic] ──► 边缘 Agent</div>
+            <div class="list-item"><span class="dot orange"></span><b>安全特性</b>：执行端仅单向出站长连接，零对外开放入站端口</div>
+            <div class="list-item"><span class="dot orange"></span><b>核心价值</b>：跨安全网络边界异步穿透，离线消息削峰保序缓冲</div>
+          </div>
+        </div>
+
+        <!-- 模式 2: gRPC 模式 -->
+        <div class="card blue">
+          <div class="card-head">
+            <span class="card-title"><span class="dot blue"></span>模式 ② · gRPC 高性能接入</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="badge blue">--mode executor</span>
+              <span class="badge" style="color: #58a6ff;">核心内网 / 边缘网关</span>
+            </div>
+          </div>
+          <div class="sub-grid">
+            <div class="sub-box">
+              <div class="sub-title"><span class="dot blue"></span>PUSH 机制 (默认首选 · 主动直推)</div>
+              <div class="list-item" style="font-size: 10.5px;">调度中枢全局最优规划，微秒级即时直达</div>
+              <div class="list-item" style="font-size: 10.5px; color: #58a6ff;">路径最短无锁竞争，全局负载与亲和感知</div>
+            </div>
+            <div class="sub-box">
+              <div class="sub-title"><span class="dot green"></span>PULL 机制 (边缘备选 · 被动拉取)</div>
+              <div class="list-item" style="font-size: 10.5px;">节点长轮询领单，行级排他锁抢占</div>
+              <div class="list-item" style="font-size: 10.5px; color: #3fb950;">面向中心无法直达网络，或大流量反压削峰</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 流转提示分割 2 -->
+    <div class="flow-bar">
+      <div class="flow-line"></div>
+      <div class="flow-text">仅接入协议不同 · 统一由 ExecutionRuntime 驱动 · 开放 Executor SDK 支持扩展任意业务算力</div>
+    </div>
+
+    <!-- 3. 底部统一执行运行时 -->
+    <div class="panel exec-panel">
+      <div class="panel-header">
+        <span class="panel-title green">统一本地执行引擎运行时 (Unified Execution Runtime & SDK)</span>
+        <span class="panel-sub">共享底层 ExecutionRuntime · 异构脚本与 SDK 扩展 · 两阶段制品物化 · 进程全生命周期强杀</span>
+      </div>
+      <div class="grid-3">
+        <!-- 制品物化流水线 -->
+        <div class="card green">
+          <div class="card-head">
+            <span class="card-title"><span class="dot green"></span>制品物化与分层依赖</span>
+            <span class="badge">Artifact & Layering</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot green"></span><b>分层依赖隔离</b>：业务源码与公共依赖库分层独立挂载</div>
+            <div class="list-item"><span class="dot green"></span><b>单飞防雪崩</b>：Singleflight 归并拉取，临时解压原子物化</div>
+            <div class="list-item"><span class="dot green"></span><b>内容寻址复用</b>：SHA-256 全局内容寻址，多级 LRU 缓存热复用</div>
+          </div>
+        </div>
+
+        <!-- 开放 SDK 扩展 -->
+        <div class="card purple">
+          <div class="card-head">
+            <span class="card-title"><span class="dot purple"></span>开放 SDK 扩展生态</span>
+            <span class="badge purple">Extensible SDK</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot purple"></span><b>开放 Handler 契约</b>：内置 Shell/Python/Ansible 外自研引擎
+            </div>
+            <div class="list-item"><span class="dot purple"></span><b>元数据自发现</b>：参数规范与程序类型随租约自动上报</div>
+            <div class="list-item"><span class="dot purple"></span><b>统一管线抽象</b>：无论 gRPC 还是 Kafka，底层共享 Engine</div>
+          </div>
+        </div>
+
+        <!-- 生产级安全沙箱治理 -->
+        <div class="card orange">
+          <div class="card-head">
+            <span class="card-title"><span class="dot orange"></span>生产级安全沙箱与治理</span>
+            <span class="badge">Security & Governance</span>
+          </div>
+          <div class="item-list">
+            <div class="list-item"><span class="dot orange"></span><b>独立 PGID 强杀</b>：杀死父进程连带销毁子进程，绝无孤儿僵尸</div>
+            <div class="list-item"><span class="dot orange"></span><b>30s 终止墓碑</b>：主动拦截网络抖动迟到任务，防意外复活</div>
+            <div class="list-item"><span class="dot orange"></span><b>凭据与流式脱敏</b>：敏感变量 AES-256 加密，输出正则动态脱敏</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

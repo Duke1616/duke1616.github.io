@@ -30,7 +30,7 @@ export default withMermaid(defineConfig({
       { text: '身份治理', link: '/eiam/concept' },
       { text: '资产管理', link: '/cmdb/concept' },
       { text: '工单中心', link: '/workflow/concept' },
-      { text: '任务中心', link: '/task/template' },
+      { text: '任务中心', link: '/task/architecture' },
       { text: '系统运维', link: '/system/deploy' },
       { text: '演示环境', link: 'http://www.fleetops.top/' }
     ],
@@ -128,8 +128,13 @@ export default withMermaid(defineConfig({
         text: '任务中心',
         collapsed: false,
         items: [
-          { text: '任务模版', link: '/task/template' },
-          { text: '执行节点', link: '/task/execution' }
+          { text: '架构与调度拓扑', link: '/task/architecture' },
+          { text: '代码制品与模版', link: '/task/template' },
+          { text: '环境变量与凭据', link: '/task/variable' },
+          { text: '执行单元与调度路由', link: '/task/execution' },
+          { text: '异构执行引擎与 SDK', link: '/task/engine' },
+          { text: 'Ansible 凭据与互信', link: '/task/ansible-credential' },
+          { text: '运行模式与配置实战', link: '/task/startup' }
         ]
       },
       {
