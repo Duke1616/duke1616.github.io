@@ -70,7 +70,14 @@ export default withMermaid(defineConfig({
           { text: '模型定义', link: '/cmdb/model' },
           { text: '资产与全文检索', link: '/cmdb/asset' },
           { text: '拓扑与关联图谱', link: '/cmdb/relation' },
-          { text: '微服务插件体系', link: '/cmdb/plugin' }
+          {
+            text: '微服务插件',
+            collapsed: false,
+            items: [
+              { text: '架构与运行时', link: '/cmdb/plugin' },
+              { text: '契约与模型注入', link: '/cmdb/plugin-dev' }
+            ]
+          }
         ]
       },
       {

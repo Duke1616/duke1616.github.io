@@ -1,77 +1,129 @@
 # 契约治理工具链
 
-在多团队协同或复杂的微服务架构下，接口鉴权经常面临两大工程痛点：
-1. **权限码硬编码与拼写漂移**：开发人员在代码中使用字面量字符串（如 `"ticket:create"`），极易因大小写拼错、重构未同步导致鉴权失效。
-2. **接口文档维护滞后**：传统 Swagger 需要在代码中手写海量的 `@Router`、`@Param` 注释，极易与实际入参出参结构脱节。
+在微服务矩阵与跨团队协同下，接口鉴权常面临两大痛点：**权限码硬编码拼写漂移**与**接口文档维护滞后**。
 
-EIAM 提供了开箱即用的跨项目命令行工具链（CLI Tooling），将权限契约与文档生成提升至**编译期强类型安全**高度。
+EIAM 提供了一套覆盖编译期代码生成与运维凭据治理的命令行工具。所有工具均为**独立解耦、按需选用**，下游微服务可根据自身需求自由选择引入，无强制绑定。
 
+---
 
-## 1. 强类型权限契约生成器 (`permgen`)
+## 1. 工具矩阵总览
 
-`permgen` 是一个基于 Go 原生 AST（抽象语法树）分析的权限契约编译器。
+| 工具 / 命令 | 架构定位 | 核心输入 | 核心产出 | 选用建议 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`permgen`** | 编译期静态脚手架 | Handler 源码 | 强类型权限常量、领域模型元数据、权限蓝图文档 | 需要强类型权限拦截、杜绝字面量拼写错误时选用 |
+| **`swaggergen`** | 编译期文档生成器 | Handler 结构体 | 标准接口规范 (`swagger.json`) 与离线交互网页 | 需要免手写注释快速导出 API 文档与在线调试页面时选用 |
+| **`eiam token gen`** | 运维凭据生成器 | 微服务服务标识 | 资产自发现专属令牌 (`eiam_sct_*`) | 微服务需要向上自动上报并对账物理接口资产时选用 |
+| **`eiam cert gen`** | 证书签发工具 | 组织名称与有效期 | 自签名证书 (`.crt`) 与私钥 (`.key`) | 离线部署、K8s Secret 挂载或单点登录证书轮换时选用 |
 
-```text
-业务 Handler 代码 (AST 扫描)
-    -> 提取路由动作与权限码声明
-    -> 编译生成强类型常量契约包 (pkg/contract/permission/)
-    -> 生成全平台权限矩阵大盘文档 (docs/permissions.md)
+---
+
+## 2. 强类型权限契约生成器
+
+该工具基于抽象语法树静态分析业务 Handler 的路由动作与权限需求，**无需启动服务**即可完成代码与文档生成：
+
+```mermaid
+flowchart LR
+    Code["业务 Handler 源码<br/>(语法树扫描)"] --> PermGen["生成引擎"]
+    PermGen --> PermGo["zz_generated_perms.go<br/>(强类型权限常量)"]
+    PermGen --> ModelGo["zz_generated_models.go<br/>(领域模型元数据)"]
+    PermGen --> PermDoc["permissions.md<br/>(全系统权限大盘文档)"]
 ```
 
-### 核心收益
-- **编译期拼写校验**：下游微服务在编写代码时，强制引用强类型常量（例如 `permission.Ticket.History`），拼写错误将在 `go build` 编译期被直接拦截。
-- **权限依赖可视化**：自动分析接口间的前置依赖关系，输出全系统统一的权限矩阵大盘。
+### 2.1 三大核心产物
+1. **强类型权限常量 (`pkg/contract/permission/zz_generated_perms.go`)**：
+   下游业务编写代码时，强制引用强类型常量（如 `permission.Ticket.History`）。拼写错误将在编译期被直接拦截，彻底杜绝字符串漂移；
+2. **领域模型元数据 (`pkg/contract/model/zz_generated_models.go`)**：
+   静态导出业务实体类型元数据，供策略引擎统一注册；
+3. **权限大盘蓝图文档 (`docs/permissions.md`)**：
+   自动提取模块、资源、动作的层级依赖关系，生成全平台对齐的权限字典文档。
 
-### 使用方法
+### 2.2 命令参数
 ```bash
-# 扫描 Handler 目录并刷新当前工程的权限契约代码
-permgen -s ./internal/web
+permgen \
+  -s ./internal/web \
+  -g ./pkg/contract/permission/zz_generated_perms.go \
+  -m ./pkg/contract/model/zz_generated_models.go \
+  -d ./docs/permissions.md \
+  --strict
 ```
 
+- `-s, --scan`：扫描的源码根目录（默认 `./internal/web`）；
+- `-g, --go-out`：权限常量代码输出路径；
+- `-m, --model-out`：领域模型代码输出路径；
+- `-d, --doc-out`：权限大盘文档输出路径；
+- `--strict`：严格模式，遇到依赖死锁或未定义时阻断退出。
 
-## 2. 零注释 OpenAPI 3.0 生成器 (`swaggergen`)
+---
 
-传统的接口文档生成工具要求开发者在 Handler 前编写数十行复杂的文档注解，既侵入了业务逻辑，又容易遗漏维护。
+## 3. 零注释文档生成器
 
-`swaggergen` 采用纯静态 AST 结构体推导引擎：
-- **零注释侵入**：直接解析 Handler 的入参结构体、响应包装类及路由规则。
-- **标准规范输出**：自动导出标准的 OpenAPI 3.0 `swagger.json`。
-- **内嵌交互式预览**：可直接生成三栏式离线交互网页（无需搭建额外的 Swagger UI 服务器），支持在线调试与 Bearer Token 鉴权。
+传统文档工具需在 Handler 代码上手写海量注释，侵入业务且极易与真实参数脱节。
 
-### 使用方法
+该工具通过纯静态语法分析直接提取入参/出参结构体与路由定义，实现**零注释侵入**：
+
+### 3.1 核心产出
+- **标准接口规范 (`swagger.json`)**：标准元数据，供前端自动生成代码或导入网关；
+- **单文件离线交互页面 (`index.html`)**：内嵌三栏式交互前端，无需部署外部服务，本地双击即可在线调试与验签。
+
+### 3.2 命令参数
 ```bash
-# 扫描业务代码并导出 OpenAPI 规范与静态预览页面
-swaggergen -s ./internal/web -o ./api/docs/swagger.json --html ./api/docs/index.html
+swaggergen \
+  -s ./internal/web \
+  -o ./api/docs/swagger.json \
+  --html ./api/docs/index.html \
+  --title "EIAM API Documentation" \
+  --version "1.0.0"
 ```
 
+---
 
-## 3. 跨微服务集成接入规范
+## 4. 微服务自发现凭据工具
 
-EIAM 的工具链已解耦为可独立分发的二进制 CLI。生态内的各个微服务仓库（如 `ecmdb`、`etask`、`eflow`）无需复制代码，可通过 Go 官方工具链直接全局安装：
+在网状协同架构中，各微服务可按需向上自报自身的物理接口资产。为防止微服务之间越权篡改，提供了专属凭据签发工具：
 
 ```bash
-# 1. 安装权限契约生成器
-go install github.com/Duke1616/eiam/cmd/permgen@latest
-
-# 2. 安装零注释 OpenAPI 生成器
-go install github.com/Duke1616/eiam/cmd/swaggergen@latest
+# 为指定微服务生成资产自发现专属令牌
+eiam token gen --service eflow
 ```
 
-在各下游微服务项目的根目录中，推荐通过 `Taskfile.yaml` 将其固化为自动化任务：
+- **安全边界**：生成带有 `eiam_sct_` 前缀的高随机令牌，强绑定至系统租户与指定服务；
+- **防跨服务篡改**：微服务仅被允许上报并对账其自身的路由与权限资产，无权影响其他服务；
+- **配置接入**：将生成的令牌配置到微服务的配置文件中（`policy.discovery_token`），按需开启自动注册。
+
+---
+
+## 5. 离线证书生成工具
+
+用于离线部署、容器挂载或单点登录证书轮换：
+
+```bash
+# 离线生成 3 年有效期的自签名证书与私钥
+eiam cert gen --cn "eiam.local" --org "FleetOps" --days 1095 --out ./certs
+```
+
+- 生成标准的 `.crt` 证书与 `.key` 私钥（默认 2048 位）；
+- 可直接用于签名断言与服务间双向认证。
+
+---
+
+## 6. 工程自动化集成
+
+按需在项目的构建脚本中固化需要的代码生成任务：
 
 ```yaml
-# Taskfile.yaml 示例
 tasks:
   gen:perm:
-    desc: 扫描路由并导出强类型权限契约
+    desc: 运行权限扫描并生成强类型契约与权限蓝图
     cmds:
-      - permgen -s ./internal/web
+      - go run ./cmd/permgen
 
   gen:swagger:
-    desc: 零注释导出 OpenAPI 3.0 规范
+    desc: 运行零注释接口规范与交互页面生成
     cmds:
-      - swaggergen -s ./internal/web -o ./api/docs/swagger.json --html ./api/docs/index.html
+      - go run ./cmd/swaggergen
 ```
 
-> [!NOTE]
-> 部署 EIAM 基础服务与整体环境准备，请参阅 [生产部署与高可用指南](/system/deploy)。
+---
+
+> [!TIP]
+> 掌握了鉴权、多租户、单点登录与工具链体系后，若需了解系统在生产环境的落地，请参阅 [生产部署与高可用指南](/system/deploy)。

@@ -1,99 +1,175 @@
 # 模型管理与字段定义
 
-在 ECMDB 中，**模型（Model）** 是对现实基础设施与逻辑资产的抽象蓝图（类似于面向对象中的 Class）。所有的资产数据（如某台具体的云主机）都是某个模型的**实例（Instance）**。
+在 ECMDB 中，**模型（Model）** 是对现实基础设施与逻辑资源的元数据蓝图。用户定义模型与字段，底层自动映射为统一资产集合（`c_resources`）中的动态平铺读写，全生命周期无需触碰底层数据库 DDL。
 
-通过模型管理，管理员可以在不修改底层数据库结构的前提下，任意定义系统所需的配置项结构。
+---
 
+## 1. 结构设计与三级编排
 
-## 1. 模型结构与层级
+模型体系遵循元数据驱动设计，将分类组织、表单编排与字段存储清晰解耦：
 
-系统按 **「模型分组（Group）」** 与 **「具体模型（Model）」** 组织资产维度：
+<div class="model-step-flow">
+  <div class="step-card">
+    <div class="step-badge">Level 1</div>
+    <div class="step-name">模型分组</div>
+    <div class="step-code">Model Group</div>
+    <div class="step-desc">业务分类：计算 / 网络 / 存储</div>
+  </div>
+  <div class="step-arrow">➔</div>
+  <div class="step-card">
+    <div class="step-badge">Level 2</div>
+    <div class="step-name">资产模型</div>
+    <div class="step-code">model_uid</div>
+    <div class="step-desc">资产蓝图：host / redis / switch</div>
+  </div>
+  <div class="step-arrow">➔</div>
+  <div class="step-card">
+    <div class="step-badge">Level 3</div>
+    <div class="step-name">属性分组</div>
+    <div class="step-code">Attribute Group</div>
+    <div class="step-desc">UI 表单编排：基础 / 规格 / 凭据</div>
+  </div>
+  <div class="step-arrow">➔</div>
+  <div class="step-card">
+    <div class="step-badge">Level 4</div>
+    <div class="step-name">自定义字段</div>
+    <div class="step-code">field_uid</div>
+    <div class="step-desc">平铺打散入库：ip / port / password</div>
+  </div>
+</div>
+
+### 核心元数据对象
+
+* **模型标识**：全局唯一的英文标识（如 `host`、`switch`），作为资产数据模型区分、拓扑连线及 API 路由的核心锚点；
+* **属性分组**：归类字段业务维度，控制控制台表单与资产详情页的渲染分区；
+* **字段标识**：属性的唯一英文 Key，随资产写入直接平铺在 `c_resources` 顶层根文档中。
+
+---
+
+## 2. 字段类型与控制约束
+
+系统原生提供 7 种标准字段类型，覆盖运维场景下的各类数据录入与存储需求：
+
+| 字段类型 | 类型代码 | 适用场景与特性 | 支持控制属性 |
+| :--- | :--- | :--- | :--- |
+| **字符串** | `string` | 单行短文本输入（如主机名、管理 IP、序列号、MAC 地址） | 必填、敏感加密、超链接 |
+| **多行文本** | `multiline` | 多行长文本输入（如备注描述、配置脚本、公钥证书、私钥） | 必填、敏感加密 |
+| **数值** | `number` | 整数或浮点数字（如 CPU 核数、机柜 U 位、内存大小） | 必填 |
+| **布尔** | `boolean` | 二元状态开关（是 / 否，如是否公网暴露、监控状态） | 必填 |
+| **日期时间** | `datetime` | 日期与时间选择（如交付时间、保修截止日） | 必填 |
+| **列表** | `list` | 预设枚举下拉选择（如云厂商、机房区域、运行状态） | 必填 |
+| **文件** | `file` | 附件与文件上传（如设备巡检单、采购凭据、配置文件） | 必填 |
+
+### 核心控制属性
+
+* **必填校验**：开启后在前端录入、批量导入以及外部写入时执行强校验，空值直接拦截；
+* **敏感加密**：仅支持字符串和多行文本，标记后自动采用 AES-GCM-256 加密落盘（存储为 `ENC:V1:...`），列表检索与详情展示自动置空脱敏；
+* **超链接**：仅支持字符串，前端自动渲染为可点击跳转的外链（如云平台控制台、外部监控仪表盘）；
+* **排序权重**：基于稀疏索引算法，支持在控制台通过拖拽实时重排属性的展示顺序。
+
+---
+
+## 3. 资产展示列设置
+
+管理员可在模型中按需定制资产台账列表的默认展示字段与先后次序：
+
+- **显隐与拖拽排序**：通过穿梭抽屉自由勾选显示属性，并上下拖拽调整表格列的先后顺序；
+- **智能默认兜底**：新建模型若未手动配置展示列，系统默认自动提取前 6 个核心业务属性（自动排除文件类型）呈现。
+
+---
+
+## 4. 模型删除的四重级联安全防线
+
+误删模型会导致关联的资产数据和网络拓扑发生不可逆破坏。ECMDB 在 Service 层实现了基于 **`IDeleteModelDependencyChecker`** 接口的多维度级联安全阻断：
 
 ```mermaid
-graph TD
-    Root[资产模型树] --> Group1[主机与计算资源]
-    Root --> Group2[网络与安全设施]
-    Root --> Group3[应用与中间件]
-
-    Group1 --> M1[物理服务器]
-    Group1 --> M2[云主机 (CVM/ECS)]
-    Group1 --> M3[Kubernetes 集群]
-
-    Group2 --> M4[交换机/路由器]
-    Group2 --> M5[负载均衡 (SLB)]
-    Group2 --> M6[防火墙规则]
-
-    Group3 --> M7[MySQL 数据库实例]
-    Group3 --> M8[Redis 缓存集群]
+flowchart TD
+    Req["发起删除模型请求 (model_uid)"] --> C1{"1. 内置模型检查<br/>EnsureDeletable()"}
+    C1 --"系统内置模型"--> B1["❌ 拒绝删除：核心基础模型受保护"]
+    C1 --"自定义模型"--> C2{"2. 存量资产探测<br/>resourceSvc"}
+    C2 --"存在存量资产"--> B2["❌ 阻断删除：必须先下线或清空存量资产"]
+    C2 --"存量资产为 0"--> C3{"3. 拓扑依赖探测<br/>relationRMSvc"}
+    C3 --"存在拓扑依赖"--> B3["❌ 阻断删除：必须先解绑拓扑模型关系"]
+    C3 --"无任何依赖"--> C4["4. 级联清理元数据<br/>attrSvc 递归删除属性与分组"]
+    C4 --> Del["✔ 最终物理销毁模型元数据 (c_models)"]
 ```
 
-### 模型基础元数据
-创建模型时需配置以下基础属性：
-- **模型唯一标识（UID）**：全系统唯一的英文字符串（如 `host`, `switch`, `k8s_cluster`），作为底层文档集合及 API 调用的依据。
-- **模型名称**：直观的展示名称（如“云主机”、“交换机”）。
-- **所属分组**：资产所在的逻辑大类（计算、网络、存储、业务等）。
-- **模型图标**：直观的 UI 图标，在拓扑图谱及导航中展示。
+### 级联依赖检查器接口
 
-
-## 2. 字段类型与配置规范
-
-每个模型由若干个 **字段（Attribute）** 构成。ECMDB 提供了丰富的字段类型与校验规则：
-
-| 字段类型 | 适用场景 | 属性说明与示例 |
-| :--- | :--- | :--- |
-| **单行文本 (`string`)** | 主机名、SN 号、MAC 地址、公网 IP | 支持正则表达式校验、最小/最大字符限制 |
-| **多行文本 (`text`)** | 备注说明、配置片段、初始化脚本 | 支持长文本展示与换行 |
-| **数值型 (`number`)** | CPU 核心数、内存容量 (GB)、机柜 U 位 | 支持最小值、最大值、步长控制 |
-| **布尔开关 (`boolean`)** | 是否通外网、是否生产环境、是否纳管监控 | 展现为 Switch 开关组件 |
-| **单选枚举 (`select`)** | 云厂商（阿里云/腾讯云/AWS）、运行状态 | 可配置静态选项列表（Label / Value 键值对） |
-| **多选枚举 (`multi_select`)** | 关联标签、安装组件列表 | 数组形态存储，支持多选标签渲染 |
-| **日期时间 (`datetime`)** | 上架时间、维保到期日、折旧周期 | 支持标准格式化（YYYY-MM-DD HH:mm:ss） |
-| **密文字段 (`password`)** | SSH 登录凭证、DB 访问密码、Token | **核心安全特性**：落库对称加密，前端默认掩码展示 |
-| **外键引用 (`reference`)** | 归属机房、负责人、所属业务系统 | 关联至其他模型或系统用户列表 |
-
-
-## 3. 字段的高级约束与安全控制
-
-为了保障资产录入的数据质量与合规要求，每个字段均可开启细粒度控制：
-
-### 1. 必填约束（Required）
-标记为必填的字段在前端录入、批量导入及 API 提交时均会受到严格拦截，避免关键参数遗漏。
-
-### 2. 唯一性校验（Unique）
-如序列号（SN）、管理 IP 或云实例 ID 等关键凭证，可勾选唯一索引约束，系统会在数据库层面构建唯一索引，杜绝重复资产登记。
-
-### 3. 加密与脱敏（Encrypted & Masked）
-对于敏感资产信息（如主机的初始 root 密码、BMC 控制台密码等）：
-- **存储端**：系统采用 AES-GCM 算法对字段明文进行对称加密后存入 MongoDB，防止数据库备份泄露导致安全风险。
-- **前端展示**：在资产详情中统一显示为星号（如 `******`），仅拥有审计/解密权限的角色点击“查看”按钮并记录审计日志后方可查看明文。
-- **插件微服务联动**：[微服务插件体系](/cmdb/plugin)（如 WebSSH、SFTP、Redis 管理器）或自动化任务执行时，仅由插件后端通过内网 gRPC 申请内存瞬态解密并建立物理会话，操作人员与前端浏览器全程无需也不可能知晓真实密码。
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Admin as 管理员/录入人员
-    participant UI as 前端管理台
-    participant Svr as ECMDB 核心服务
-    participant DB as MongoDB 存储
-
-    Admin->>UI: 输入资产及敏感密码 (RootPass)
-    UI->>Svr: 发起 POST /api/cmdb/assets
-    Note over Svr: 识别模型定义中 RootPass 为 Encrypted
-    Svr->>Svr: 执行 AES 对称加密
-    Svr->>DB: 写入密文数据
-    DB-->>Svr: 写入成功
-    Svr-->>UI: 返回脱敏结果 (RootPass: "******")
+```go
+// internal/service/model/model.go
+type IDeleteModelDependencyChecker interface {
+    // CheckBeforeDelete 深度校验模型是否可删除，若存在外部依赖则返回明确错误
+    CheckBeforeDelete(ctx context.Context, modelUid string) error
+}
 ```
 
+<style>
+.model-step-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 24px;
+  flex-wrap: wrap;
+}
 
-## 4. 内置基础字段规范
+.step-card {
+  flex: 1;
+  min-width: 170px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
 
-为了规范资产的全生命周期流转，系统会为每个模型默认注入以下系统级元字段：
+.step-card:hover {
+  border-color: var(--vp-c-brand-1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
 
-- `_id`：MongoDB 默认主键 Object ID。
-- `created_at` / `updated_at`：记录创建时间与最后更新时间。
-- `created_by` / `updated_by`：操作人标识。
-- `status`：资产状态（在线、待上线、维保中、报废下线）。
+.step-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
 
-> [!NOTE]
-> 模型定义完成后，您可以进入 [资产台账与检索](/cmdb/asset) 查看如何在实际业务中录入、批量管理及高速查询资产数据。
+.step-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  margin-bottom: 2px;
+}
+
+.step-code {
+  font-size: 11px;
+  font-family: var(--vp-font-family-mono);
+  color: var(--vp-c-brand-1);
+  margin-bottom: 4px;
+}
+
+.step-desc {
+  font-size: 11.5px;
+  color: var(--vp-c-text-2);
+  line-height: 1.4;
+}
+
+.step-arrow {
+  font-size: 14px;
+  color: var(--vp-c-text-3);
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .step-arrow {
+    display: none;
+  }
+}
+</style>

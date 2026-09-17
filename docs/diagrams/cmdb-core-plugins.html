@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ECMDB 资产驱动与插件协同流转图 · 控制面与数据面解耦架构</title>
+  <script src="../../node_modules/vue/dist/vue.global.prod.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #0b0f17;
+      color: #e6edf3;
+      width: 1360px;
+      min-height: 660px;
+      padding: 24px 36px;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #1f293d;
+      margin-bottom: 24px;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #8b9bb4;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: 4px;
+      color: #58a6ff;
+      background: rgba(56, 166, 255, 0.12);
+      border: 1px solid rgba(56, 166, 255, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 画布与三列网格布局：宽间距 195px */
+    .diagram-canvas {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 195px;
+      flex: 1;
+      margin-top: 4px;
+    }
+
+    /* 左右中三列容器 */
+    .col-left,
+    .col-center,
+    .col-right {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 2;
+    }
+
+    .col-left {
+      width: 275px;
+      gap: 14px;
+    }
+
+    .col-center {
+      width: 305px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .col-right {
+      width: 285px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 通用卡片节点 */
+    .node-box {
+      border: 1px solid #283754;
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #0f1523;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    /* 节点颜色主题 */
+    .node-blue {
+      border-color: #1f6feb;
+      background: linear-gradient(145deg, #121927, #0d131e);
+    }
+    .node-blue .node-tag {
+      background: rgba(56, 139, 253, 0.2);
+      color: #58a6ff;
+      border: 1px solid rgba(56, 139, 253, 0.4);
+    }
+
+    .node-teal {
+      border-color: #1b6b8e;
+      background: linear-gradient(145deg, #0d1e29, #091620);
+    }
+    .node-teal .node-tag {
+      background: rgba(27, 107, 142, 0.25);
+      color: #56d1f8;
+      border: 1px solid rgba(27, 107, 142, 0.45);
+    }
+
+    .node-purple {
+      border-color: #8957e5;
+      background: linear-gradient(145deg, #1a142e, #110d20);
+    }
+    .node-purple .node-tag {
+      background: rgba(137, 87, 229, 0.2);
+      color: #d2a8ff;
+      border: 1px solid rgba(137, 87, 229, 0.4);
+    }
+
+    .node-gold {
+      border-color: #d29922;
+      background: linear-gradient(145deg, #241e12, #181309);
+    }
+    .node-gold .node-tag {
+      background: rgba(210, 153, 34, 0.2);
+      color: #f2cc60;
+      border: 1px solid rgba(210, 153, 34, 0.4);
+    }
+
+    .node-green {
+      border-color: #238636;
+      background: linear-gradient(145deg, #112418, #0b1710);
+    }
+    .node-green .node-tag {
+      background: rgba(35, 134, 54, 0.2);
+      color: #7ee787;
+      border: 1px solid rgba(35, 134, 54, 0.4);
+    }
+
+    .node-slate {
+      border-color: #30363d;
+      background: linear-gradient(145deg, #13181f, #0e1219);
+    }
+    .node-slate .node-tag {
+      background: rgba(110, 118, 129, 0.2);
+      color: #8b949e;
+      border: 1px solid rgba(110, 118, 129, 0.4);
+    }
+
+    /* 节点头部 */
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .node-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .node-tag {
+      font-size: 9px;
+      padding: 1.5px 6px;
+      border-radius: 3px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+    }
+
+    .node-desc {
+      font-size: 11px;
+      color: #8b9bb4;
+      line-height: 1.35;
+    }
+
+    /* 键值列表 */
+    .mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .mini-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #090e17;
+      padding: 4px 7px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .mini-label {
+      color: #8b9bb4;
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+
+    .mini-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: #e6edf3;
+      padding: 1px 5px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* 列内垂直连接胶囊 */
+    .flow-connector-vertical {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 0;
+    }
+
+    .connector-line-up,
+    .connector-line-down {
+      width: 2px;
+      height: 8px;
+      background: #283754;
+    }
+
+    .connector-badge {
+      background: #0b0f17;
+      border: 1px solid #283754;
+      border-radius: 12px;
+      padding: 2.5px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8b9bb4;
+      white-space: nowrap;
+    }
+
+    .connector-badge.blue {
+      border-color: rgba(56, 139, 253, 0.45);
+      color: #79c0ff;
+    }
+
+    .connector-badge.purple {
+      border-color: rgba(137, 87, 229, 0.45);
+      color: #d2a8ff;
+    }
+
+    .connector-badge.green {
+      border-color: rgba(63, 185, 80, 0.45);
+      color: #7ee787;
+    }
+
+    /* 全局 SVG 连线系统 */
+    .svg-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 线条上的指示胶囊 */
+    .flow-badge {
+      position: absolute;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 10.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      z-index: 10;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+      background: #0b0f17;
+      border: 1px solid #283754;
+      color: #8b9bb4;
+      line-height: 1.35;
+    }
+
+    .flow-badge.blue {
+      border-color: rgba(56, 139, 253, 0.6);
+      color: #79c0ff;
+    }
+
+    .flow-badge.slate {
+      border-color: rgba(110, 118, 129, 0.6);
+      color: #8b949e;
+    }
+
+    .flow-badge.gold {
+      border-color: rgba(210, 153, 34, 0.6);
+      color: #f2cc60;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="app">
+    <!-- 顶部标题栏 -->
+    <div class="header">
+      <div class="title-left">
+        <div class="title">ECMDB 控制面与插件数据面协同流转图 · 零信任与运维直连架构</div>
+        <div class="subtitle">用户视角全链路：资产页一键直达运维现场 · 零信任凭据瞬态注入 · 独立微服务承载高并发长连接</div>
+      </div>
+      <div class="header-badge">ARCHITECTURE PIPELINE</div>
+    </div>
+
+    <!-- 图表核心三列布局区域 -->
+    <div class="diagram-canvas" id="diagram-canvas">
+
+      <!-- ════════ 左列：用户操作与资产入口 ════════ -->
+      <div class="col-left">
+
+        <!-- 节点 1: 运维控制台操作 -->
+        <div class="node-box node-blue" id="node-user-action">
+          <div class="node-header">
+            <span class="node-title">运维控制台操作</span>
+            <span class="node-tag">USER ACTION</span>
+          </div>
+          <div class="node-desc">运维工程师在资产列表页操作栏触发：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">操作主体:</span>
+              <span class="mini-val">devops 工程师</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">目标资产:</span>
+              <span class="mini-val">Host-10086 (Linux 主机)</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">触发动作:</span>
+              <span class="mini-val" style="color: #79c0ff;">点击【WebShell 终端】</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">凭据安全:</span>
+              <span class="mini-val" style="color: #7ee787;">浏览器零明文密码</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 胶囊: 动态挂载微前端 -->
+        <div class="flow-connector-vertical">
+          <div class="connector-line-up"></div>
+          <div class="connector-badge blue">
+            <span>动态加载插件前端 ↓</span>
+          </div>
+          <div class="connector-line-down"></div>
+        </div>
+
+        <!-- 节点 2: UMD 微前端热插拔 -->
+        <div class="node-box node-teal" id="node-micro-fe">
+          <div class="node-header">
+            <span class="node-title">UMD 微前端热插拔</span>
+            <span class="node-tag">MICRO-FE</span>
+          </div>
+          <div class="node-desc">插件独立托管前端组件：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">动态拉取:</span>
+              <span class="mini-val">/static/index.umd.js</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">挂载组件:</span>
+              <span class="mini-val">xterm.js 交互式终端</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">架构收益:</span>
+              <span class="mini-val" style="color: #56d1f8;">主站零重编译、即插即用</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">交互体验:</span>
+              <span class="mini-val">工作区抽屉无缝呼出</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /col-left -->
+
+      <!-- ════════ 中列：ECMDB 控制中枢 ════════ -->
+      <div class="col-center">
+
+        <!-- 节点 3: 元数据驱动与拓扑组装 -->
+        <div class="node-box node-purple" id="node-cmdb-core">
+          <div class="node-header">
+            <span class="node-title">ECMDB 控制面中枢</span>
+            <span class="node-tag">CONTROL PLANE</span>
+          </div>
+          <div class="node-desc">三级元模型驱动与关联拓扑合成：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">资产模型:</span>
+              <span class="mini-val">Host (IP、SSH 端口、账号)</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">拓扑合成:</span>
+              <span class="mini-val" style="color: #d2a8ff;">提取关联 AuthGateway 跳板机</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">权限准入:</span>
+              <span class="mini-val">EIAM PBAC 校验连接策略</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">契约映射:</span>
+              <span class="mini-val">声明式 Tag 自动匹配字段</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 胶囊: 申请瞬态解密 -->
+        <div class="flow-connector-vertical">
+          <div class="connector-line-up"></div>
+          <div class="connector-badge purple">
+            <span>申请内存瞬态解密 ↓</span>
+          </div>
+          <div class="connector-line-down"></div>
+        </div>
+
+        <!-- 节点 4: 零信任凭据保护 -->
+        <div class="node-box node-gold" id="node-zero-trust">
+          <div class="node-header">
+            <span class="node-title">零信任凭据保护</span>
+            <span class="node-tag">ZERO-TRUST</span>
+          </div>
+          <div class="node-desc">ResourceProtector 凭据统管中心：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">数据落盘:</span>
+              <span class="mini-val" style="color: #f2cc60;">AES-GCM 高度密文存储</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">解密时机:</span>
+              <span class="mini-val">仅在建立握手瞬态明文</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">瞬态下发:</span>
+              <span class="mini-val">内网 gRPC 注入强类型对象</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">销毁策略:</span>
+              <span class="mini-val" style="color: #f2cc60;">握手建立后即刻在内存释放</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /col-center -->
+
+      <!-- ════════ 右列：数据面独立微服务与直连 ════════ -->
+      <div class="col-right">
+
+        <!-- 节点 5: 插件独立微服务 -->
+        <div class="node-box node-slate" id="node-plugin-svc">
+          <div class="node-header">
+            <span class="node-title">ecmdb-plugins 微服务</span>
+            <span class="node-tag">DATA PLANE</span>
+          </div>
+          <div class="node-desc">独立常驻进程 · 承接长连接与重 I/O：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">运行架构:</span>
+              <span class="mini-val">独立容器 / 独立物理端口</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">主站保护:</span>
+              <span class="mini-val" style="color: #79c0ff;">高并发连接不拖垮资产查询</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">双层反代:</span>
+              <span class="mini-val">Nginx / Core 透明路由透传</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">故障隔离:</span>
+              <span class="mini-val" style="color: #7ee787;">插件崩溃主站核心零影响</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 胶囊: 建立全双工直连 -->
+        <div class="flow-connector-vertical">
+          <div class="connector-line-up"></div>
+          <div class="connector-badge green">
+            <span>穿透跳板机直连目标 ↓</span>
+          </div>
+          <div class="connector-line-down"></div>
+        </div>
+
+        <!-- 节点 6: 物理直连目标主机 -->
+        <div class="node-box node-green" id="node-target-host">
+          <div class="node-header">
+            <span class="node-title">目标主机安全直连</span>
+            <span class="node-tag">LIVE SESSION</span>
+          </div>
+          <div class="node-desc">物理穿透直达服务器现场：</div>
+          <div class="mini-list">
+            <div class="mini-item">
+              <span class="mini-label">穿透网关:</span>
+              <span class="mini-val">AuthGateway:22 (跳板机)</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">目标节点:</span>
+              <span class="mini-val">Host:22 (SSH 物理直连)</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">现场交付:</span>
+              <span class="mini-val" style="color: #7ee787;">全交互式 WebShell 终端</span>
+            </div>
+            <div class="mini-item">
+              <span class="mini-label">安全合规:</span>
+              <span class="mini-val">操作审计留痕与会话录屏</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /col-right -->
+
+      <!-- SVG 全局连线层 -->
+      <svg class="svg-canvas" id="svg-canvas">
+        <defs>
+          <marker id="arr-blue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#388bfd"/>
+          </marker>
+          <marker id="arr-slate" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#8b949e"/>
+          </marker>
+          <marker id="arr-gold" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <polygon points="0 0, 6 3, 0 6" fill="#d29922"/>
+          </marker>
+        </defs>
+        <!-- 连线 1: 用户操作 -> ECMDB Core -->
+        <path id="p-action-core" stroke="#388bfd" stroke-width="2" marker-end="url(#arr-blue)" fill="none"/>
+        <!-- 连线 2: ECMDB Core -> 插件微服务 (双层透明反代) -->
+        <path id="p-core-plugin" stroke="#8b949e" stroke-width="2" marker-end="url(#arr-slate)" fill="none"/>
+        <!-- 连线 3: 零信任中心 -> 插件微服务 (gRPC 瞬态凭据注入) -->
+        <path id="p-trust-plugin" stroke="#d29922" stroke-width="2" marker-end="url(#arr-gold)" fill="none"/>
+      </svg>
+
+      <!-- 连线骑跨胶囊 -->
+      <div class="flow-badge blue" id="badge-action-core">携带资产 ID 发起操作</div>
+      <div class="flow-badge slate" id="badge-core-plugin">双层透明反代转发</div>
+      <div class="flow-badge gold" id="badge-trust-plugin">gRPC 瞬态解密注入</div>
+
+    </div>
+  </div>
+
+  <script>
+    const { createApp, onMounted, nextTick } = Vue;
+
+    createApp({
+      setup() {
+        const updateConnections = () => {
+          const canvas = document.getElementById('diagram-canvas');
+          if (!canvas) return;
+          const cr = canvas.getBoundingClientRect();
+
+          const pt = (id, side, yRatio = 0.5) => {
+            const el = document.getElementById(id);
+            if (!el) return { x: 0, y: 0 };
+            const r = el.getBoundingClientRect();
+            if (side === 'right') return { x: r.right - cr.left, y: r.top + r.height * yRatio - cr.top };
+            if (side === 'left')  return { x: r.left  - cr.left, y: r.top + r.height * yRatio - cr.top };
+            return { x: 0, y: 0 };
+          };
+
+          const curve = (pid, p1, p2) => {
+            const path = document.getElementById(pid);
+            if (!path) return;
+            const cx = Math.abs(p2.x - p1.x) * 0.45;
+            path.setAttribute('d',
+              `M ${p1.x} ${p1.y} C ${p1.x + cx} ${p1.y}, ${p2.x - cx} ${p2.y}, ${p2.x} ${p2.y}`
+            );
+          };
+
+          const pin = (bid, pid, offsetY = 0) => {
+            const badge = document.getElementById(bid);
+            const path  = document.getElementById(pid);
+            if (!badge || !path) return;
+            const mid = path.getPointAtLength(path.getTotalLength() * 0.5);
+            badge.style.left = `${mid.x}px`;
+            badge.style.top  = `${mid.y + offsetY}px`;
+          };
+
+          // 连线 1: 左列 用户操作 -> 中列 Core
+          curve('p-action-core', pt('node-user-action', 'right'), pt('node-cmdb-core', 'left'));
+          pin('badge-action-core', 'p-action-core', 0);
+
+          // 连线 2: 中列 Core -> 右列 插件微服务 (偏上方进入)
+          curve('p-core-plugin', pt('node-cmdb-core', 'right', 0.4), pt('node-plugin-svc', 'left', 0.35));
+          pin('badge-core-plugin', 'p-core-plugin', 0);
+
+          // 连线 3: 中列 零信任保护 -> 右列 插件微服务 (偏下方进入)
+          curve('p-trust-plugin', pt('node-zero-trust', 'right', 0.4), pt('node-plugin-svc', 'left', 0.75));
+          pin('badge-trust-plugin', 'p-trust-plugin', 0);
+        };
+
+        window.updateConnections = updateConnections;
+        window._draw = updateConnections;
+
+        onMounted(() => {
+          nextTick(() => {
+            updateConnections();
+            window.addEventListener('resize', updateConnections);
+            setTimeout(updateConnections, 50);
+            setTimeout(updateConnections, 200);
+          });
+        });
+
+        return {};
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

@@ -1,213 +1,128 @@
 # 微服务插件体系
 
-ECMDB 将资产元数据中心与实际运维操作面彻底解耦，构建了 **控制面 (Control Plane) 与数据面 (Data Plane) 分离** 的微服务插件体系 (`ecmdb-plugins`)。
+传统 CMDB 往往只是一个“只能看、不能动”的静态资产数据库。工程师在资产台账里查到服务器或数据库后，要想真正上手操作，依然要打开外部的堡垒机、数据库客户端、K8s 控制台或各种私有运维脚本，在多个系统之间来回切换。
 
-传统 CMDB 往往仅作为静态的资产属性台账，运维人员若需进行实际操作（如登录终端、拉取配置、管理缓存），通常需要在 CMDB 与各运维工具之间来回切换；若将操作逻辑硬编码在 CMDB 内部，又会导致系统严重膨胀。ECMDB 采用插件微服务架构，使资产具备即开即用的动态运维能力。
+为什么市面上的 CMDB 很少直接集成具体的运维操作？
+因为把各种运维连接逻辑硬编码进 CMDB 核心服务里是一场灾难：SSH 长连接消耗大量内存，文件传输占用极高带宽；各种各样的第三方工具协议极易引发阻塞或崩溃，一旦某个运维功能写出 Bug 导致进程 Panic，整个公司的 CMDB 资产中枢就彻底瘫痪了。
 
-- **源码仓库**：[GitHub: Duke1616/ecmdb-plugins](https://github.com/Duke1616/ecmdb-plugins)
+为了彻底打破“资产数据”与“运维现场”的割裂，ECMDB 打造了一套**高隔离、强安全、支持任意业务自行扩展的微服务插件生态**：
+- **将 CMDB 升级为可操作的运维中枢**：将具体的在线操作逻辑以插件微服务的形式解耦挂载到资产上，不仅开箱支持服务器终端管理，更支持团队按需自行扩展；
+- **进程级绝对隔离，免除后顾之忧**：插件作为独立的微服务运行在数据面，无论承载多大的网络流量、哪怕插件代码发生致命崩溃，**资产主站始终坚如磐石，核心查询零感知、零影响**；
+- **零信任凭据安全**：插件完全无需接触数据库和加密根密钥，主站仅在建立连接的瞬间在内存中透明注入解密凭据，握手连通即刻在内存彻底销毁。
 
+- **官方插件生态仓库**：[GitHub: Duke1616/ecmdb-plugins](https://github.com/Duke1616/ecmdb-plugins)
+- **主站核心仓库**：[GitHub: Duke1616/ecmdb](https://github.com/Duke1616/ecmdb)
+- **统一开发套件 (SDK)**：`pkg/plugin`（开箱即用的声明式契约、泛型解析与反代路由）
 
-## 1. 架构定位与设计原则
+---
 
-```mermaid
-flowchart TB
-    subgraph ControlPlane["ECMDB Core (控制面)"]
-        Meta["模型定义与元数据"]
-        Secret["AES-GCM 加密凭据存储"]
-        Gateway["插件网关反向代理"]
-        Discovery["插件注册与发现中心"]
-        DecryptEngine["内存态瞬时解密引擎"]
-    end
+## 1. 架构定位与协同流转
 
-    subgraph DataPlane["ecmdb-plugins (数据面微服务)"]
-        SSHPlugin["SSH / SFTP 插件微服务 (builtin.ssh)"]
-        RedisPlugin["Redis 管理器微服务 (builtin.redis)"]
-        K8sPlugin["Kubernetes 插件微服务 (扩展)"]
-    end
+无论企业接入何种运维插件，系统都遵循一致的控制面与数据面协同流程：
 
-    subgraph FrontendBase["前端微基座 (Vue 3 / TypeScript)"]
-        BaseApp["主站 Web 控制台"]
-        MicroLoader["微前端动态加载器"]
-    end
+<div class="arch-graph-card">
+  <img src="/images/cmdb-core-plugins.png" alt="ECMDB 控制面与插件数据面协同流转图" class="arch-graph-img" />
+</div>
 
-    subgraph TargetInfra["目标基础设施"]
-        Host["Linux 服务器"]
-        RedisInst["Redis 实例"]
-        Cluster["K8s 集群"]
-    end
+### 核心解耦原则
 
-    DataPlane --"1. 启动自发现注册 (gRPC)"--> Discovery
-    BaseApp --"2. 请求插件视图"--> Gateway
-    Gateway --"3. 代理静态资源"--> SSHPlugin
-    MicroLoader --"4. 动态装载 UMD 组件"--> BaseApp
-    SSHPlugin --"5. 申请瞬时凭据 (gRPC)"--> DecryptEngine
-    SSHPlugin --"6. 建立物理协议连接"--> Host
-    RedisPlugin --"物理连接"--> RedisInst
-```
-
-### 核心设计原则
-
-1. **控制面与数据面彻底解耦**：ECMDB Core 专注元数据管理、权限校验与凭据安全；插件微服务独立承载底层连接握手与具体运维协议。
-2. **热插拔与独立演进**：插件以独立微服务部署，采用 Mono-repo 体系管理，插件升级或故障不影响 ECMDB 主站稳定性。
-3. **零信任凭据安全流转**：敏感凭证（SSH 密码、私钥、数据库口令）绝不下发给浏览器，全链路仅在后端微服务内存中瞬态流转，用后即弃。
-4. **微前端热加载**：插件前端打包为标准 UMD 格式微组件，主站基座在运行时动态加载，插件发版无需重新编译主站。
-
-
-## 2. 交互时序流转
-
-插件微服务的运行遵循标准化的生命周期交互：
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 运维人员 / 浏览器
-    participant Web as 前端微基座
-    participant Core as ECMDB Core (控制面)
-    participant Plugin as 插件微服务 (数据面)
-    participant Target as 目标基础设施
-
-    Note over Core,Plugin: 阶段一：服务启动与自发现
-    Plugin->>Core: 启动并自动 gRPC 注册 (上报元数据、绑定资产模型与路由契约)
-    
-    Note over User,Web: 阶段二：用户触发动作
-    User->>Web: 访问主机资产详情 -> 点击【Web Shell】工作台
-    Web->>Core: 拉取插件运行时视图配置
-    Core-->>Web: 返回 index.umd.js 地址与 apiBase 代理网关前缀
-    Web->>Plugin: 经由 Core 网关动态拉取 UMD 微组件并挂载渲染
-    
-    Note over Web,Plugin: 阶段三：会话建立与安全凭据流转
-    Web->>Plugin: 发起会话请求 (仅携带 resource_id，无任何密码)
-    Plugin->>Core: gRPC 请求动作上下文 ResolveActionContext(resource_id)
-    Note over Core: 在控制面内存中按拓扑安全解密密码/私钥
-    Core-->>Plugin: 返回明文凭证上下文 (ConnectionTarget)
-    Plugin->>Target: 建立物理 SSH / SFTP 握手通道
-    Plugin-->>Web: 升级为 WebSocket 双向全双工数据流
-```
-
-
-## 3. 两类插件模型与 DSL 编排
-
-在 `ecmdb-plugins` 体系中，插件被抽象为两类业务形态：
-
-| 插件形态 | 核心特点 | 典型场景 | DSL 编排示例 |
-| :--- | :--- | :--- | :--- |
-| **资产驱动型 (Target-Driven)** | **最常用**。与 CMDB 具体资产模型（或复合拓扑）强绑定，在资产详情页声明式挂载运维工作台。 | SSH 终端、SFTP 文件管理、Redis 管理器、数据库管控台 | `plugin.Target[T](reg, modelUID).Model(...).Workspace(...)` |
-| **纯动作型 (Pure Actions)** | 无资产绑定。作为系统级全局入口或批量排障工具。 | 网络连通性检测、集群全局巡检 | `reg.Action("ping", "Ping").Definition()` |
-
-### 资产驱动型插件定义示例 (Go)
-
-```go
-package define
-
-import (
-	"context"
-	"github.com/Duke1616/ecmdb/pkg/plugin"
-)
-
-const (
-	PluginUID     = "builtin.redis"
-	ActionConsole = "console"
-	ModelRedis    = "redis_instance"
-)
-
-// 1. 声明数据资产模型结构
-// 包含 password/secret/token 等字段由主站底层自动识别并加密存储
-type RedisTarget struct {
-	Host     string `plugin:"host,label=主机地址,field=ip,required"`
-	Port     int    `plugin:"port,label=连接端口,default=6379"`
-	Password string `plugin:"password,label=连接密码"` // 敏感加密字段
-	DB       int    `plugin:"db,label=默认库号,default=0"`
-}
-
-// 2. 导出自描述元数据契约
-func (p Provider) Definition() (plugin.Definition, error) {
-	reg := plugin.NewRegistry(
-		PluginUID,
-		"Redis 管理器",
-		plugin.Type("builtin"),
-		plugin.Version("1.0.0"),
-		plugin.Description("提供 Redis 在线命令行交互与实时监控能力"),
-		plugin.ExternalServiceRuntime(p.upstream, plugin.RuntimeHealthPath("/healthz")),
-	)
-
-	return plugin.Target[RedisTarget](reg, ModelRedis).
-		Model("Redis实例", "缓存服务").
-		Workspace(
-			ActionConsole,
-			"Redis 控制台",
-			plugin.Icon("Terminal"),
-			plugin.Permission("cmdb:redis:console"),
-			plugin.CardFields("name", "ip", "port"),
-		).
-		Definition()
-}
-
-// 3. 消费动作上下文：一键向主站拉取内存态已解密凭据
-func ResolveRedisTarget(ctx context.Context, resolver plugin.ContextResolver, resourceID int64) (RedisTarget, error) {
-	return plugin.ResolveActionRoot[RedisTarget](ctx, resolver, PluginUID, ActionConsole, resourceID)
-}
-```
-
-
-## 4. 全链路凭据零泄露机制
-
-传统运维系统常因前端直接接收解密后的明文凭证，导致 DevTools 审查网络请求即可截获机密密码。ECMDB 采用零信任瞬态内存流转机制：
-
-```mermaid
-flowchart LR
-    Browser["前端浏览器"] --"1. 仅传 resource_id"--> Plugin["插件微服务后端"]
-    Plugin --"2. gRPC 凭证申请"--> Core["ECMDB Core 控制面"]
-    Core --"3. 内存 AES 解密"--> Core
-    Core --"4. 内网 gRPC 瞬态传递"--> Plugin
-    Plugin --"5. 物理连接握手"--> Host["目标物理机/服务"]
-    Plugin <-."6. 升级 WebSocket 数据流".-> Browser
-```
-
-1. **静态高强度加密**：写入 CMDB 的所有主机密码、私钥、Token，在落盘前均通过 AES-GCM 高性能算法密文存储。
-2. **前端凭据零可见**：浏览器端仅持有资产全局唯一 `resource_id`，请求包体中不包含任何敏感凭据。
-3. **瞬态内存流转**：仅在底层建立物理连接的一瞬间，插件后端通过内网专用 gRPC 通道向 Core 发起凭据申请；Core 在内存中即时解密并返回，插件完成协议握手后立即在内存中释放，全链路不落盘。
-
-
-## 5. 微前端热插拔机制 (UMD)
-
-主站前端基座具备通用的微前端组件动态加载引擎，插件前端与主站实现完全解耦：
-
-### 核心约定
-
-- **打包格式**：插件前端统一打包为标准 UMD 单包 (`index.umd.js` + `index.css`)，由插件微服务自身直接静态托管。
-- **公共依赖外部化**：`vue`、`element-plus`、`pinia` 由主站基座统一运行时注入，禁止打包进插件产物，极大缩减插件体积。
-- **全局命名规范**：遵循 `EcmdbPlugin` + PascalCase 规则。例如插件 ID 为 `builtin.ssh`，挂载全局变量名为 `window.EcmdbPluginBuiltinSsh`。
-- **标准入口**：入口文件统一导出 `export { Index }`，基座按需挂载。
-
-
-## 6. 双层网关反向代理
-
-插件微服务部署在内网环境中，无需对外暴露物理端口，统一由 ECMDB 控制面网关提供反向代理：
-
-```mermaid
-flowchart LR
-    Browser["浏览器 / 微前端"] -->|"/api/cmdb/plugin-runtime/:id/*"| Nginx["Nginx 网关"]
-    Nginx -->|"/api/plugin-runtime/:id/*"| Core["ECMDB Core"]
-    Core -->|"剥离网关前缀 -> /*"| Plugin["插件后端物理端口"]
-```
-
-| 请求层级 | 请求路径示例 | 代理行为 |
+| 考量维度 | 资产主站（控制面 ECMDB Core） | 扩展插件微服务（数据面 ecmdb-plugins） |
 | :--- | :--- | :--- |
-| **浏览器发起** | `/api/cmdb/plugin-runtime/builtin.ssh/static/index.umd.js` | 请求微前端静态产物或业务 API |
-| **Nginx 网关** | `/api/plugin-runtime/builtin.ssh/static/index.umd.js` | 剥离 `/cmdb` 业务域前缀，转发至 Core |
-| **ECMDB Core** | `/static/index.umd.js` | 剥离前缀，透明转发至插件后端监听端口 |
+| **主要职责** | 统管资产模型、元数据检索、多租户权限校验、加密凭据统一落盘 | 承接具体的底层运维协议（如 SSH、SFTP 等）与交互会话 |
+| **进程隔离** | 核心主站独立运行，不受任何业务运维操作影响 | 插件独立部署在内网环境，**即使内存泄漏或发生崩溃，也 100% 隔离在插件自身进程内** |
+| **性能保护** | 资产查询高频并发，CPU 与内存资源受到严格保障 | 海量长连接与重网络 I/O 全部由插件微服务分流消化 |
+| **凭据安全** | 统管机密密钥，仅在建立物理通道的毫秒级瞬间在内存中解密 | 物理连通后**立刻清空内存明文**，全链路零落盘，浏览器前端绝不接触密码 |
 
-> **开发规范**：插件微前端调用自身后端接口时，必须使用主站注入的 `props.apiBase` 作为 URL 前缀，严禁硬编码插件物理地址。
+---
 
+## 2. 为什么开发者愿意基于它扩展运维能力？
 
-## 7. 官方插件实现参考
+ECMDB 插件体系并非专为特定运维工具定制，而是一套**吸引开发者低成本快速实现运维需求**的通用底座。开发一个全新的运维插件拥有以下三大绝招：
 
-### 1. SSH / SFTP 插件 (`builtin.ssh`)
+### 绝招一：不用写 SQL，不用管加解密，声明即所得
+传统二次开发最头疼的是翻表结构、写 SQL、查关联关系、找密码解密接口。
+而在 ECMDB 中：
+- 开发者只需要写一个普通的 Go 结构体，打上 `plugin:"..."` 标签声明自己需要什么资产字段（如 IP、端口、账号、密码）；
+- 管理员在管理控制台保存插件的模型绑定时，主站会读取契约，**全自动把所需模型建好、字段映射对齐、拓扑规则连好**，完全不需要手工去一个个建表加属性；
+- 建立连接时，主站自动把已解密的数据打包成强类型的 Go 结构体直接注入给你，开发体验行云流水。
 
-- **Web 终端控制台**：基于 `xterm.js` 构建，支持完整 ANSI 终端色彩、Vim/Emacs 全屏编辑、窗口自适应（Window Resize）及快捷命令代填。
-- **可视化 SFTP 资源管理器**：图形化浏览远程主机目录树，支持拖拽批量上传、文件下载、权限属性查看与轻量配置文件在线即时编辑。
+### 绝招二：微前端独立打包，无需改动主站一行前端代码
+- 插件前端微组件采用标准 UMD 格式打包，直接托管在插件自己的后端静态目录里；
+- 公共库（Vue、Element Plus 等）直接复用主站现成的基座运行时，插件打包产物仅数十 KB；
+- 在管理台启用插件绑定后，资产列表操作栏**自动挂载专属操作按钮**；点击按钮时，主站才动态拉取插件前端并在抽屉中滑出操作工作区；
+- **插件上线、发版、更新，主站前端零修改、零重新编译、零重启**。
 
-### 2. Redis 插件 (`builtin.redis`)
+### 绝招三：零信任凭据流转，天生具备企业级安全合规
+- 无论目标机器的登录密码还是私钥，浏览器端从始至终只传递资产 ID，网络抓包绝无明文泄露风险；
+- 敏感凭据仅在插件后端建立物理连接的瞬间瞬态注入，连通后即刻在内存彻底销毁，天然满足严格的企业审计与合规规范。
 
-- 提供独立连接会话窗口，支持在线命令行调试、实时键值查询与连接指标监控。
-- 绑定 `redis_instance` 资产模型，支持在资产详情页一键开启管理工作台。
+---
+
+## 3. 两阶段生命周期机制
+
+从插件启动到用户在页面上发起操作，系统经历了两个严密阶段：
+
+### 阶段一：插件启动与全自动装配
+
+插件启动后主动向主站汇报并完成注册，整个过程零人工干预：
+
+```text
+插件微服务启动 ──[ 1. RPC: RegisterPlugin ]──> 资产主站
+                                                   │
+                <──[ 2. HTTP: GET /definition ]────┘ (主站反向拉取插件能力定义)
+                                                   │
+                                     ┌─────────────┴─────────────┐
+                                     ▼                           ▼
+                             注册反向代理路由            持久化操作动作与权限
+                        (/api/plugin-runtime/:id/*)   (资产列表操作栏自动挂载按钮)
+```
+
+1. **上报服务地址**：插件启动后，调用主站 RPC 接口上报插件唯一标识（如 `builtin.ssh`）及其内网访问地址；
+2. **反拉自描述契约**：主站反向调用插件的 `/definition` 接口，拉取插件支持的操作名称、图标、挂载的目标资产模型、所需字段及微前端地址；
+3. **注册并持久化**：主站自动在网关中生成反向代理路由规则，并在对应资产模型的操作权限中生效。此时刷新资产列表页，该模型下的每一项资产操作栏都会自动出现该插件的入口按钮。
+
+---
+
+### 阶段二：用户触发与全双工会话流转
+
+当工程师在资产列表页点击按钮发起操作时，网络与安全凭据开始流转：
+
+```text
+[ 浏览器 ] ──1. 点击操作 (只带资产 ID，不含明文)──> [ 接入层网关 ]
+                                                        │ 2. 剥离公共前缀
+                                                        ▼
+                                                 [ 主站反代网关 ]
+                                                        │ 3. 转发至插件内网地址
+                                                        ▼
+                                                 [ 插件微服务 ]
+                                                        │ 4. RPC 申请连接凭据
+                                                        ▼
+                                                 [ 主站内存瞬态解密 ]
+                                                 (解密密码/私钥，组装跳板机拓扑)
+                                                        │ 5. 注入强类型对象返回
+                                                        ▼
+[ 浏览器 ] <══ 7. 升级为全双工长连接 ═══════════════ [ 插件微服务 ] ──6. 物理直连──> [ 目标服务器 / 实例 ]
+                                            (连接成功立刻销毁内存凭据)
+```
+
+1. **双层透明反向代理**：插件部署在内网无公网端口，请求统一经由接入层与主站反向代理网关透传，原生支持协议升级；
+2. **凭据按需下发**：插件后端通过内网安全调用接口向主站申请上下文；主站在内存中把加密的密码或私钥解密，若该资产配置了跳板机，主站还会沿着拓扑关系把跳板机信息一并组装打包返回；
+3. **通道建立与凭据销毁**：插件利用解密凭据穿透跳板机与目标服务器建立物理通信；**网络握手成功瞬间，插件立即清空释放内存中的明文凭据**，并将连接升级为全双工长连接，向浏览器交付交互式运维工作台。
+
+---
+
+## 4. 当前支持的插件能力
+
+目前官方已正式实装并开箱即用的插件为**在线终端与文件管理器（`builtin.ssh`）**：
+
+| 插件标识 | 插件名称 | 绑定资产模型 | 当前支持的核心能力 |
+| :--- | :--- | :--- | :--- |
+| `builtin.ssh` | 在线终端与文件管理器 | 主机模型（物理服务器 / 云主机） | • **在线命令行终端**：交互式命令行，原生支持跳板机网关穿透登录<br>• **可视化文件管理**：目录树浏览、文件拖拽上传下载、文本文件在线轻量查看与编辑 |
+
+> [!NOTE]
+> 系统底层具备通用的插件微服务与契约协议，后续可根据团队实际运维需求按相同规范扩展更多资产插件。
+
+---
+
+> [!TIP]
+> 想要为您的团队开发一个专属的运维插件？请查阅专篇实战指南：[插件契约与模型注入](/cmdb/plugin-dev)，了解如何仅凭一个结构体即可实现模型自动创建、已有字段别名映射与拓扑注入。

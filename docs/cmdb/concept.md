@@ -1,73 +1,100 @@
 # 设计理念与架构
 
-ECMDB 是平台中负责 **「元数据驱动」** 与 **「数字资产中枢」** 的核心微服务。它不仅支持传统物理与虚拟资源的管理，更通过**动态模型架构**与**多维关联拓扑**，提供一致、实时、高可靠的配置数据基座。
+ECMDB 是平台生态中负责**数字资产中枢**与**动态元模型驱动**的核心微服务。
 
+- **源码仓库**：[GitHub: Duke1616/ecmdb](https://github.com/Duke1616/ecmdb)
+- **服务契约**：HTTP RESTful (`:8000`) / 内部 gRPC (`:8078`)
+- **核心底座**：Golang 1.25、Percona Server for MongoDB 7.0+、Redis 7.0+
 
-## 1. 核心定位与能力架构
+---
 
-在现代异构混合云与分布式环境下，资产形态涵盖物理服务器、云主机、容器集群（K8s）、网络设备及 PaaS 设施。ECMDB 打破传统 CMDB 刚性表结构的局限，围绕元数据模型驱动与运维操作入口构建能力矩阵：
+## 1. 总体架构
 
-```mermaid
-flowchart TD
-    subgraph ModelLayer["1. 模型驱动层 (Schema-less)"]
-        Model["CI 模型与分组管理"]
-        Field["动态属性与格式校验"]
-        Encrypt["敏感密码透明加解密"]
-        Model --> Field --> Encrypt
-    end
+ECMDB 采用分层解耦架构，核心能力由元模型驱动引擎与专用存储底座协同实现：
 
-    subgraph DataLayer["2. 数据存储与检索 (Percona MongoDB)"]
-        Collection["动态集合隔离存储 (c_{model})"]
-        Ngram["原生 ngram 全文滑窗检索"]
-        Collection --> Ngram
-    end
+![ECMDB 核心分层架构全景](/images/cmdb-core-architecture.png)
 
-    subgraph TopologyLayer["3. 关系拓扑与分析 (Relation Graph)"]
-        Relation["上下游依赖拓扑关系"]
-        Impact["变更割接影响面分析"]
-        Relation --> Impact
-    end
+- **外部接入层**：承接统一 Web 控制台交互、自动化脚本与第三方系统纳管，提供 HTTP RESTful (`:8000`) 与内部 gRPC (`:8078`) 双通道，统一由 **EIAM** 执行身份认证与 PBAC 策略拦截；
+- **Core 服务层**：收敛**三级元模型管理**、**资产平铺内联读写**与**双向拓扑图谱**，横切贯穿 `IResourceProtector` 敏感凭据统管；
+- **底层引擎层**：基于 Percona MongoDB 统一集合（平铺存储 + 原生 ngram 倒排索引）提供高吞吐，辅以 Redis 分布式锁与热点缓存。
 
-    subgraph PluginLayer["4. 插件微服务生态 (ecmdb-plugins)"]
-        PluginGateway["控制面网关透明反向代理"]
-        MicroFrontend["微前端 UMD 动态按需加载"]
-        ZeroTrust["瞬态内存解密与凭据零泄露"]
-        Plugins["微服务集合 (SSH / SFTP / Redis)"]
-        PluginGateway & MicroFrontend & ZeroTrust --> Plugins
-    end
+---
 
-    ModelLayer --> DataLayer --> TopologyLayer --> PluginLayer
+## 2. 核心设计特色
+
+### 统一平铺内联存储 (`bson:",inline"`)
+
+异构资产属性统一收敛在单一集合 `c_resources` 中，依靠 `model_uid` 区分模型，通过平铺打散存储在根文档：
+
+```json
+{
+  "_id": "66e7f8...",
+  "resource_id": 10086,
+  "tenant_id": "system",
+  "model_uid": "host",
+  "name": "prod-app-01",
+  "ip": "10.0.8.21",
+  "password": "ENC:V1:a8f93c...", // Secure 敏感属性自动带版本前缀落盘加密
+  "ctime": 1726488000
+}
 ```
 
+- **零 DDL 锁表**：新增自定义字段只需插入元数据，资产数据免 DDL、随写随存；
+- **原生原子局部读写**：所有字段直接位于根路径，天然支持 MongoDB 原生 `$set` / `$unset` 局部原子更新；
+- **高效复合索引**：支持自由针对高频平铺字段建立复合索引（如 `tenant_id + model_uid + ip`）。
 
-## 2. 为什么采用「模型驱动架构」？
+### 原生通配 3-gram 全文检索
 
-传统基于 MySQL 单表或固定列模式的资产管理系统，在面对异构资源（例如：物理机需要记录插槽和带外管理口，而云主机需要记录 VPC、可用区与安全组）时，往往需要频繁执行 `ALTER TABLE` 或通过冗余字段（如 `field_1`, `field_2`）来适配，这带来了极高的维护代价和扩展瓶颈。
+免除外部 Elasticsearch 与 Canal/Kafka 同步链路，依托 Percona MongoDB 原生 `ngram` 插件实现全字段模糊搜索：
 
-ECMDB 采用 **元模型驱动设计（Metadata Model-Driven）**：
-1. **模型定义一切**：每一个配置项类型（Configuration Item, CI）均是一个独立的模型，包含模型唯一标识、分类分组、显示图标以及动态属性集合。
-2. **零 DDL 动态扩展**：新增资产类型或为现有资产扩容字段，无需进行数据库停机或表结构迁移，所有配置即时生效。
-3. **分层抽象**：支持按业务域分类（主机、网络、存储、应用、安全），并可在此基础上建立上层服务的归属逻辑。
+```go
+// internal/repository/dao/init.go
+// $** 通配捕获任意动态属性，ngram 滑窗实现中文/IP片段分词
+indexes := []mongo.IndexModel{
+    {
+        Keys:    bson.D{{Key: "$**", Value: "text"}},
+        Options: options.Index().SetDefaultLanguage("ngram"),
+    },
+}
+```
 
+- **全字段自动纳入**：任意模型下新增的属性自动被倒排索引捕获，零维护成本；
+- **零外部中间件**：单套数据库即可支撑 IP 片段、序列号和名称的毫秒级全文检索。
 
-## 3. 存储引擎选型：为什么是 Percona MongoDB？
+### 关系拓扑与穿透寻路
 
-系统核心元数据与资产存储基于 **Percona MongoDB** 构建，充分利用了其无模式文档存储与企业级特性：
+资产并非孤立存在，系统通过 `c_relations` 与 `c_relation_types` 构建双向网络：
 
-| 维度 | 传统关系型数据库方案 (MySQL / PostgreSQL) | ECMDB 方案 (Percona MongoDB) |
-| :--- | :--- | :--- |
-| **属性伸缩性** | 字段固定，动态字段常采用 EAV（实体-属性-值）模式，联表查询性能骤降 | 原生 BSON/JSON 文档存储，天然支持树状、嵌套与异构字段 |
-| **检索效率** | 模糊查询（`LIKE '%keyword%'`）无法走常规 B-Tree 索引，全表扫描耗时高 | 内置原生 **`ngram` 全文分词索引**，毫秒级跨字段模糊检索 |
-| **安全与脱敏** | 需应用层自行加密解密，字段检索困难 | 支持字段级属性加密标记，敏感凭证落库保护，安全合规 |
-| **架构解耦** | 关系强绑定，数据变更影响全局关联事务 | 资产数据与 MySQL 核心权限表解耦，隔离大吞吐量高频数据读写 |
+- **类型约束**：预定义源与目标约束（如 `Host 运行于 Pod`、`Host 关联网关`），约束关系基数；
+- **双向图谱解析**：支持向下依赖追踪与向上影响面反查；
+- **级联网络穿透**：运维直连或下发脚本时，自动沿拓扑寻路合成跳板机网关上下文。
 
+### 凭据全生命周期保护
 
-## 4. 核心特性一览
+对密码、私钥等机密数据执行闭环防护：
 
-- **动态字段体系**：支持单行文本、数值、多行文本、单选/多选下拉、日期时间、引用关联以及密码加密属性。
-- **高性能全文检索**：输入 IP、主机名、序列号或责任人拼音，利用 ngram 索引毫秒级定位资产。
-- **多维拓扑图谱**：直观展示基础设施层级与应用服务之间的双向依赖关系。
-- **微服务插件体系**：基于独立数据面微服务与微前端 UMD 热插拔技术，动态挂载 WebSSH 终端、SFTP 文件管理器与各类运维工作台，全程凭证零泄露。
+- **落盘阶段**：`Secure` 属性统一采用 **AES-GCM-256** 密文存储；
+- **展示阶段**：列表与详情查询在接口层自动置空脱敏（展示 `[已脱敏]`），防止前端审查泄露；
+- **直连阶段**：微服务插件（WebShell/SFTP）发起握手时通过内网 gRPC 瞬态解密，握手完毕即刻在内存彻底销毁。
+
+---
+
+## 3. 控制面与数据面解耦
+
+ECMDB 将运维操作入口彻底与资产主站解耦：
+
+- **ECMDB Core（控制面）**：专注元模型、资产管理与凭据安全，保障高可用；
+- **ecmdb-plugins（数据面）**：独立微服务承接 SSH WebShell 长连接与 SFTP 流传输，崩溃或高负载完全不影响主站。
 
 > [!TIP]
-> 了解了整体设计思想后，您可以继续阅读 [模型管理](/cmdb/model) 了解如何从零定制属于自己企业的 CI 资产模型。
+> 详细反向代理流程、插件自动注册契约与 Go Tag 绑定机制，请参阅：  
+> **👉 [微服务插件体系](/cmdb/plugin)**
+
+---
+
+## 4. 快速导航
+
+- **[模型管理与字段定义](/cmdb/model)**：模型创建、属性组与字段校验规则
+- **[资产数据生命周期](/cmdb/asset)**：资产增删改查、ngram 检索与批量导入导出
+- **[关系拓扑与依赖网](/cmdb/relation)**：拓扑类型约束与图谱连通性
+- **[微服务插件体系](/cmdb/plugin)**：独立插件微服务架构与零信任握手全景
