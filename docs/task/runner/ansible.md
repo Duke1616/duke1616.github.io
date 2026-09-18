@@ -37,32 +37,67 @@ Ansible **仅支持以代码工程项目（Project）形态交付**，必须包�
 
 ```yaml [site.yml (主剧本)]
 ---
-- name: 生产服务批量更新
+- name: 生产集群滚动发布与健康校验
   hosts: production_nodes
-  serial: "50%"  # 滚动升级：每次执行 50% 的节点
+  serial: "50%"       # 滚动灰度：每次执行 50% 节点，保障业务连续性
+  gather_facts: yes   # 收集目标主机系统指纹
   become: yes
 
-  tasks:
-    - name: 检查连通性与 Python 环境
+  # 1. 前置检查与动态入参校验
+  pre_tasks:
+    - name: 探测受控主机 SSH 互信与 Python 环境
       ansible.builtin.ping:
 
-    - name: 启动或重启业务守护进程
+    - name: 校验动态入参 deploy_version
+      ansible.builtin.assert:
+        that:
+          - deploy_version is defined
+          - deploy_version | length > 0
+        fail_msg: "未检测到有效的发布版本号 deploy_version，作业中止"
+
+  # 2. 核心部署任务
+  tasks:
+    - name: 同步应用服务配置文件
+      ansible.builtin.template:
+        src: templates/app.conf.j2
+        dest: /etc/app/app.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: 优雅重载业务服务
+
+  # 3. 后置业务探针校验
+  post_tasks:
+    - name: 验证服务端口就绪
+      ansible.builtin.wait_for:
+        port: 8080
+        delay: 2
+        timeout: 15
+        state: started
+
+  # 4. 触发式事件处理器 (幂等防震荡)
+  handlers:
+    - name: 优雅重载业务服务
       ansible.builtin.systemd:
-        name: nginx
+        name: app-service
         state: reloaded
 ```
 
 ```yaml [inventory/hosts.yml (主机清单)]
+---
 all:
   children:
     production_nodes:
       vars:
-        # 绑定凭据别名 (节点执行瞬间自动装配私钥，代码中零密钥暴露)
+        # 绑定 ETask 宿主凭据安全库别名 (沙箱动态装配私钥，代码库零密钥暴露)
         etask_credential_ref: production-linux
         ansible_port: 22
+        ansible_user: ops_admin
       hosts:
         10.0.1.11:
+          node_role: primary
         10.0.1.12:
+          node_role: secondary
 ```
 
 :::

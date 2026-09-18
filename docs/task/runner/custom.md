@@ -33,25 +33,36 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/Duke1616/etask/sdk/executor"
 )
 
-type HelloHandler struct{}
+type HttpCheckHandler struct{}
 
-func (HelloHandler) Name() string { return "hello_handler" }
-func (HelloHandler) Desc() string { return "示例问候执行器" }
+func (HttpCheckHandler) Name() string { return "http_check" }
+func (HttpCheckHandler) Desc() string { return "HTTP 服务健康探测执行器" }
 
-// 1. 声明入参元数据（驱动控制台自动渲染输入表单）
-func (HelloHandler) Metadata() []executor.Parameter {
+// 1. 声明入参元数据（驱动控制台自动渲染动态输入表单）
+func (HttpCheckHandler) Metadata() []executor.Parameter {
 	return []executor.Parameter{
 		{
-			Key: "target_name", Desc: "目标名称", Required: true,
+			Key: "endpoint", Desc: "探测目标 URL", Required: true,
 			Bindings: map[string]executor.Binding{
 				"static": &executor.BindingOption{
-					Label:       "手动输入",
-					Placeholder: "请输入目标名称...",
+					Label:       "目标地址",
+					Placeholder: "https://api.example.com/healthz",
+					Component:   "input",
+				},
+			},
+		},
+		{
+			Key: "timeout_sec", Desc: "请求超时时间 (秒)", Default: "5",
+			Bindings: map[string]executor.Binding{
+				"static": &executor.BindingOption{
+					Label:       "超时时间",
+					Placeholder: "5",
 					Component:   "input",
 				},
 			},
@@ -60,18 +71,34 @@ func (HelloHandler) Metadata() []executor.Parameter {
 }
 
 // 2. 执行核心业务逻辑
-func (HelloHandler) Run(ctx *executor.Context) error {
-	name, _ := ctx.GetResolvedParam("target_name")
+func (HttpCheckHandler) Run(ctx *executor.Context) error {
+	endpoint, _ := ctx.GetResolvedParam("endpoint")
 
-	ctx.Log("[info] 开始执行问候任务: %s", name)
-	ctx.ReportProgress(50)
+	ctx.Log("开始对端点发起健康探测: %s", endpoint)
+	ctx.ReportProgress(25)
 
-	// 向 FD 3 结果通道写入结构化数据供下游工作流消费
-	ctx.SetResult("greeting", fmt.Sprintf("Hello, %s!", name))
-	ctx.SetResult("timestamp", time.Now().Unix())
+	start := time.Now()
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(endpoint)
+	latency := time.Since(start).Milliseconds()
+
+	if err != nil {
+		ctx.Log("端点请求失败: %v", err)
+		ctx.SetResult("status", "UNREACHABLE")
+		return fmt.Errorf("服务不可达: %w", err)
+	}
+	defer resp.Body.Close()
+
+	ctx.ReportProgress(80)
+	ctx.Log("探测响应完成，HTTP 状态码: %d，耗时: %dms", resp.StatusCode, latency)
+
+	// 向专用结果通道回传结构化指标，供下游工作流节点消费
+	ctx.SetResult("status_code", resp.StatusCode)
+	ctx.SetResult("latency_ms", latency)
+	ctx.SetResult("status", "HEALTHY")
 
 	ctx.ReportProgress(100)
-	ctx.Log("[info] 任务执行完成")
+	ctx.Log("健康探测成功结束")
 	return nil
 }
 ```

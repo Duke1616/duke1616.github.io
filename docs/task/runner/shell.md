@@ -27,30 +27,76 @@ flowchart LR
 
 ## 1. 快速上手（最小工作模板）
 
-以下为满足 ETask 生产规范的标准脚本模板，包含安全防护头、动态入参读取与官方内置库结果回传：
+以下为满足 ETask 生产规范的标准脚本模板，采用模块化函数组织，包含安全防护头、时间戳日志、入参解析、优雅退出与官方结果回传：
 
 ```bash
 #!/usr/bin/env bash
+# ==============================================================================
+# ETask 标准 Shell 作业模板
+# 特性：POSIX 进程组强杀兼容、入参沙箱防御解析、结构化指标回传与优雅退出清理
+# ==============================================================================
 set -euo pipefail
 
-# 1. 跨层依赖引用：加载系统内置工具库 (含 want_result) 与环境配置
+# ------------------------------------------------------------------------------
+# 1. 运行时初始化与安全陷阱 (Trap)
+# ------------------------------------------------------------------------------
+log_info()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  $*"; }
+log_warn()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  $*" >&2; }
+log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
+
+cleanup() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        log_error "作业执行异常终止，退出码: ${exit_code}"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+# 跨层依赖引用：加载系统内置工具库 (含 want_result) 与环境配置
 if [[ -n "${ETASK_SYSTEM_ROOT:-}" && -f "$ETASK_SYSTEM_ROOT/third_party/utils/want_result.sh" ]]; then
     source "$ETASK_SYSTEM_ROOT/third_party/utils/want_result.sh"
 fi
 [[ -n "${ETASK_SHELL_ENV_FILE:-}" && -f "$ETASK_SHELL_ENV_FILE" ]] && source "$ETASK_SHELL_ENV_FILE"
 
-# 2. 从入参文件安全读取业务参数 (0600 只读 JSON)
-TARGET_HOST=$(jq -r '.host // "127.0.0.1"' "$ETASK_ARGS_FILE")
-PORT=$(jq -r '.port // 80' "$ETASK_ARGS_FILE")
+# ------------------------------------------------------------------------------
+# 2. 业务主流程
+# ------------------------------------------------------------------------------
+main() {
+    # 从入参文件安全提取参数 (带防御性默认值)
+    local target_host port timeout_sec
+    if [[ -n "${ETASK_ARGS_FILE:-}" && -f "$ETASK_ARGS_FILE" ]]; then
+        target_host=$(jq -r '.host // "127.0.0.1"' "$ETASK_ARGS_FILE")
+        port=$(jq -r '.port // 80' "$ETASK_ARGS_FILE")
+        timeout_sec=$(jq -r '.timeout // 3' "$ETASK_ARGS_FILE")
+    else
+        target_host="127.0.0.1"
+        port=80
+        timeout_sec=3
+    fi
 
-echo "[info] 开始探测目标主机端口: $TARGET_HOST:$PORT"
+    log_info "开始探测目标主机连通性 -> ${target_host}:${port} (超时: ${timeout_sec}s)"
 
-# 3. 模拟业务逻辑
-nc -z -w 3 "$TARGET_HOST" "$PORT" && STATUS="UP" || STATUS="DOWN"
+    # 执行业务逻辑
+    local status="DOWN"
+    if nc -z -w "$timeout_sec" "$target_host" "$port" 2>/dev/null; then
+        status="UP"
+        log_info "目标端口探测成功 [${status}]"
+    else
+        log_warn "目标端口探测失败或超时 [${status}]"
+    fi
 
-# 4. 回传结构化结果 (推荐使用系统内置 want_result 函数，供下游工作流消费)
-want_result "host" "$TARGET_HOST"
-want_result "status" "$STATUS"
+    # 回传结构化结果供下游工作流分支判定 (FD 3)
+    if declare -F want_result >/dev/null; then
+        want_result "target_host" "$target_host"
+        want_result "port" "$port"
+        want_result "status" "$status"
+    fi
+
+    # 业务失败显式返回非零码
+    [[ "$status" == "UP" ]] || return 1
+}
+
+main "$@"
 ```
 
 ---
