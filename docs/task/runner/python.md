@@ -100,10 +100,10 @@ ETask 采用统一的文件沙箱传递参数，杜绝命令行参数注入攻�
 
 ### 开箱即用的模块导入
 
-在你的脚本或工程包中，可直接 `import` 平台预置的系统组件库或租户自研公共包，无需手动调整 `sys.path`：
+系统核心公共库（如 `etask` 基础 SDK）随服务启动已自驱注入系统制品库。在执行节点拉起脚本时，可直接 `import` 系统库或租户自研公共包，无需手动调整 `sys.path`：
 
 ```python
-# 直接引入系统底层工具模块
+# 直接引入系统底层工具模块 (服务启动内置注入，零配置可用)
 from etask.third_party.base.want_result import want_result
 
 # 引入租户级自研通用库
@@ -118,7 +118,7 @@ from ops_common.scripts import helper
 
 ### 4.1 官方推荐：使用系统内置 `want_result`
 
-系统内置库已封装好 JSON 序列化与异常容错：
+系统内置库随服务启动自动注入，已封装好 JSON 序列化与异常容错：
 
 ```python
 from etask.third_party.base.want_result import want_result
