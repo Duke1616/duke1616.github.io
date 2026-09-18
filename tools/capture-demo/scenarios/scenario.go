@@ -43,13 +43,13 @@ type Step struct {
 
 // Scenario 描述一篇文档页面所有截图的完整场景
 type Scenario struct {
-	Name        string // 场景标识符（CLI 参数通过此名称匹配）
-	Description string // 场景业务描述（用于 CLI 帮助与列表展示）
-	Steps       []Step // 有序步骤
+	Name        string            // 场景标识符（CLI 参数通过此名称匹配）
+	Description string            // 场景业务描述（用于 CLI 帮助与列表展示）
+	Masks       map[string]string // 场景专属数据脱敏映射（仅在该场景生命周期内生效，隔离互不污染）
+	Steps       []Step            // 有序步骤
 }
 
-// ── 极简声明式 DSL Helper 函数 ───────────────────────────────────────────────
-// 提供如剧本般直观的声明体验，大幅降低写场景时的样板代码噪音。
+// Action 构造辅助函数
 
 // Nav 页面跳转
 func Nav(path string) Action {

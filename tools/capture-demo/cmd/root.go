@@ -7,27 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
 // 全局配置实例
 var globalConfig struct {
-	BaseURL     string
-	Headless    bool
-	OutputDir   string
-	Username    string
-	Password    string
-	Tenant      string
-	GlobalMasks map[string]string
-}
-
-// 默认生产环境数据脱敏字典（全场景自动生效）
-var defaultGlobalMasks = map[string]string{
-	"82.156.165.98":  "10.0.12.88",
-	"12222":          "22",
-	"linuxserver.io": "root",
-	"openssh-server": "prod-app-01",
+	BaseURL    string
+	Headless   bool
+	OutputDir  string
+	Username   string
+	Password   string
+	Tenant     string
+	ExtraMasks map[string]string // 外部环境变量 DEMO_MASKS 注入的补充脱敏规则（可选）
 }
 
 var rootCmd = &cobra.Command{
@@ -57,7 +48,7 @@ func Execute() {
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "\n❌ 执行异常: %v\n\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -89,9 +80,8 @@ func prepareConfig() error {
 		globalConfig.OutputDir = absOutput
 	}
 
-	// 融合内置与环境变量自定义的脱敏规则
-	customMasks := parseCustomMasks(os.Getenv("DEMO_MASKS"))
-	globalConfig.GlobalMasks = lo.Assign(defaultGlobalMasks, customMasks)
+	// 读取环境变量注入的补充脱敏规则（若有）
+	globalConfig.ExtraMasks = parseCustomMasks(os.Getenv("DEMO_MASKS"))
 
 	return nil
 }
@@ -103,7 +93,7 @@ func parseCustomMasks(rawJSON string) map[string]string {
 	}
 	var res map[string]string
 	if err := json.Unmarshal([]byte(rawJSON), &res); err != nil {
-		fmt.Printf("⚠️  解析 DEMO_MASKS 环境变量失败: %v\n", err)
+		fmt.Printf("[warn] 解析 DEMO_MASKS 环境变量失败: %v\n", err)
 		return nil
 	}
 	return res

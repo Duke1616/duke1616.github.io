@@ -70,14 +70,22 @@ func New(opts Options) (*Driver, error) {
 	return d, nil
 }
 
-// SetGlobalMasks 配置全局脱敏字典（截屏前自动全量替换）
-func (d *Driver) SetGlobalMasks(masks map[string]string) {
-	if d.GlobalMasks == nil {
-		d.GlobalMasks = make(map[string]string)
-	}
+// SetMasks 设置当前驱动器生效的数据脱敏字典（传入 nil 则清空）
+func (d *Driver) SetMasks(masks map[string]string) {
+	d.GlobalMasks = make(map[string]string)
 	for k, v := range masks {
 		d.GlobalMasks[k] = v
 	}
+}
+
+// ClearMasks 清空当前驱动器的所有脱敏规则
+func (d *Driver) ClearMasks() {
+	d.GlobalMasks = make(map[string]string)
+}
+
+// SetGlobalMasks 兼容历史调用，等同于 SetMasks
+func (d *Driver) SetGlobalMasks(masks map[string]string) {
+	d.SetMasks(masks)
 }
 
 // Close 释放浏览器进程及所有相关资源

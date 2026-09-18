@@ -55,37 +55,37 @@ func runScenarios(cmd *cobra.Command, args []string) error {
 	}
 	defer bot.Close()
 
-	// 注入全局脱敏字典
-	bot.SetGlobalMasks(globalConfig.GlobalMasks)
-
 	// 4. 统一登录认证
-	fmt.Printf("🔑 正在登录认证 (%s)... ", globalConfig.Username)
+	fmt.Printf("[info] 正在登录: %s... ", globalConfig.Username)
 	if err := bot.Login(globalConfig.Username, globalConfig.Password); err != nil {
 		return fmt.Errorf("登录失败: %w", err)
 	}
-	fmt.Println("✅ 成功")
+	fmt.Println("成功")
 
 	// 5. 租户空间切换
 	if globalConfig.Tenant != "" {
-		fmt.Printf("🏢 切换至租户空间: %s\n", globalConfig.Tenant)
+		fmt.Printf("[info] 切换租户: %s\n", globalConfig.Tenant)
 		if err := bot.SwitchTenant(globalConfig.Tenant); err != nil {
-			fmt.Printf("⚠️  租户切换提示: %v（继续执行）\n", err)
+			fmt.Printf("[warn] 切换租户失败: %v（继续执行）\n", err)
 		}
 	}
 
-	// 6. 执行目标场景
+	// 6. 执行目标场景（各场景独立脱敏，互不干扰污染）
 	totalSteps := lo.SumBy(targets, func(s scenarios.Scenario) int {
 		return len(s.Steps)
 	})
-	fmt.Printf("\n🚀 启动文档截图流水线：共 %d 个场景，累计 %d 个步骤\n", len(targets), totalSteps)
+	fmt.Printf("[info] 开始执行截图任务: 场景数=%d, 总步骤数=%d\n", len(targets), totalSteps)
 	start := time.Now()
 
 	for _, sc := range targets {
+		if len(globalConfig.ExtraMasks) > 0 {
+			sc.Masks = lo.Assign(sc.Masks, globalConfig.ExtraMasks)
+		}
 		runner.Run(bot, sc, globalConfig.OutputDir)
 	}
 
 	duration := time.Since(start).Round(time.Millisecond)
-	fmt.Printf("\n🎊 全部目标场景截图完成！总耗时: %v\n", duration)
+	fmt.Printf("\n[done] 所有场景执行完成，总耗时: %v\n", duration)
 	return nil
 }
 

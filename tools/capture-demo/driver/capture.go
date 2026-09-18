@@ -31,7 +31,7 @@ func (d *Driver) Capture(outputPath string) error {
 	if err := os.WriteFile(outputPath, buf, 0644); err != nil {
 		return fmt.Errorf("保存截图失败: %w", err)
 	}
-	fmt.Printf("   📸 已导出 → %s (%d KB)\n", strings.TrimPrefix(outputPath, "../../docs/public/"), len(buf)/1024)
+	fmt.Printf("   -> 已保存: %s (%d KB)\n", strings.TrimPrefix(outputPath, "../../docs/public/"), len(buf)/1024)
 	return nil
 }
 

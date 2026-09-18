@@ -12,13 +12,18 @@ func (d *Driver) Login(username, password string) error {
 	if err := d.Navigate("/login"); err != nil {
 		return err
 	}
+	_ = d.WaitVisible("input[type='password'], input")
+	_ = d.WaitStable(300 * time.Millisecond)
+
 	// 使用页面真实的 placeholder 文字定位输入框
 	_ = d.FillInput("账号", username)    // placeholder: "账号 / 邮箱"
 	_ = d.FillInput("登录密码", password) // placeholder: "登录密码"
 
-	// 按钮文案含空格 "登 录"
+	// 按钮文案可能为 "登 录" 或 "登录"
 	if err := d.ClickText("登 录"); err != nil {
-		return fmt.Errorf("点击登录按钮失败: %w", err)
+		if err2 := d.ClickText("登录"); err2 != nil {
+			return fmt.Errorf("点击登录按钮失败: %w", err)
+		}
 	}
 
 	// 等待导航栏出现，确认登录跳转真正完成（而非固定等待）

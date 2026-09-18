@@ -13,17 +13,27 @@ import (
 // Run 执行一个完整的 Scenario
 // outputBase: 截图输出基准目录（如 "../../docs/public"）
 func Run(bot *driver.Driver, scenario scenarios.Scenario, outputBase string) {
-	fmt.Printf("\n🎬 场景 [%s]（共 %d 步）\n%s\n", scenario.Name, len(scenario.Steps), divider())
+	fmt.Printf("\n=== 场景: %s (%d 步) ===\n", scenario.Name, len(scenario.Steps))
+
+	// 1. 场景级专属脱敏生效（严格作用域隔离，不污染其他场景）
+	if len(scenario.Masks) > 0 {
+		fmt.Printf("[info] 加载脱敏规则: %d 条\n", len(scenario.Masks))
+		bot.SetMasks(scenario.Masks)
+	} else {
+		bot.ClearMasks()
+	}
 
 	ctx := newRunContext(bot, outputBase)
 
 	for i, step := range scenario.Steps {
-		fmt.Printf("\n📋 %d/%d  %s\n", i+1, len(scenario.Steps), step.Title)
+		fmt.Printf("\n[%d/%d] %s\n", i+1, len(scenario.Steps), step.Title)
 		ctx.runStep(step)
 	}
 
 	ctx.cleanup()
-	fmt.Printf("\n✅ 场景 [%s] 完成\n%s\n", scenario.Name, divider())
+	// 场景执行结束后重置脱敏规则，归还干净的驱动环境
+	bot.ClearMasks()
+	fmt.Printf("=== 场景: %s 完成 ===\n", scenario.Name)
 }
 
 // ── runContext 封装单次场景执行的可变状态 ──────────────────────────────────
@@ -49,7 +59,7 @@ func (c *runContext) runStep(step scenarios.Step) {
 	for _, action := range step.Actions {
 		if err := c.dispatch(action); err != nil {
 			// 单步失败不中断，打印警告后继续
-			fmt.Printf("   ⚠️  [%s] %v\n", action.Type, err)
+			fmt.Printf("   [warn] [%s] %v\n", action.Type, err)
 		}
 	}
 	if step.Output == "" {
@@ -57,7 +67,7 @@ func (c *runContext) runStep(step scenarios.Step) {
 	}
 	path := c.outputBase + "/" + strings.TrimLeft(step.Output, "/")
 	if err := c.active.Capture(path); err != nil {
-		fmt.Printf("   ❌ 截图失败: %v\n", err)
+		fmt.Printf("   [error] 截图失败: %v\n", err)
 	}
 }
 
@@ -74,7 +84,7 @@ func (c *runContext) cleanup() {
 func (c *runContext) switchToPopup(popup *driver.Driver) {
 	c.popup = popup
 	c.active = popup
-	fmt.Printf("   → 已切换到新 Tab\n")
+	fmt.Printf("   -> 已切换到新 Tab\n")
 }
 
 // ── dispatch：将 Action 分发到对应处理逻辑 ─────────────────────────────────
@@ -84,7 +94,7 @@ func (c *runContext) dispatch(a scenarios.Action) error {
 	switch a.Type {
 
 	case scenarios.ActionNavigate:
-		fmt.Printf("   → 导航: %s\n", a.Path)
+		fmt.Printf("   -> 导航: %s\n", a.Path)
 		// 如果当前在 popup 窗口，Navigate 意味着要回到主窗口
 		if c.popup != nil {
 			c.cleanup()
@@ -97,7 +107,7 @@ func (c *runContext) dispatch(a scenarios.Action) error {
 	case scenarios.ActionClickInPlace:
 		// 拦截 window.open，在当前 Tab 内导航而非弹出新 Tab
 		label := lo.Ternary(a.Text != "", a.Text, a.Selector)
-		fmt.Printf("   → 就地点击（拦截弹窗）: %s\n", label)
+		fmt.Printf("   -> 就地点击（拦截弹窗）: %s\n", label)
 		return c.active.ClickTextInPlace(a.Text)
 
 	case scenarios.ActionClickSelector:
@@ -105,43 +115,43 @@ func (c *runContext) dispatch(a scenarios.Action) error {
 		return c.handleClick(a, func() error { return c.active.ClickSelector(a.Selector) })
 
 	case scenarios.ActionWaitVisible:
-		fmt.Printf("   → 等待: %s\n", a.Selector)
+		fmt.Printf("   -> 等待: %s\n", a.Selector)
 		return c.active.WaitVisible(a.Selector)
 
 	case scenarios.ActionFillInput:
-		fmt.Printf("   → 填写 [%s] = %q\n", a.Field, a.Value)
+		fmt.Printf("   -> 填写 [%s] = %q\n", a.Field, a.Value)
 		return c.active.FillInput(a.Field, a.Value)
 
 	case scenarios.ActionFillBySelector:
-		fmt.Printf("   → 填写 [%s] = %q\n", a.Selector, a.Value)
+		fmt.Printf("   -> 填写 [%s] = %q\n", a.Selector, a.Value)
 		return c.active.FillBySelector(a.Selector, a.Value)
 
 	case scenarios.ActionSelectOpt:
-		fmt.Printf("   → 下拉 [%s] → %q\n", a.Field, a.Value)
+		fmt.Printf("   -> 下拉 [%s] -> %q\n", a.Field, a.Value)
 		return c.active.SelectOption(a.Field, a.Value)
 
 	case scenarios.ActionSubmitBtn:
 		return c.handleSubmit(a)
 
 	case scenarios.ActionWaitToast:
-		fmt.Printf("   → 等待 Toast\n")
+		fmt.Printf("   -> 等待 Toast\n")
 		return c.active.WaitToast(5 * time.Second)
 
 	case scenarios.ActionMaskText:
-		fmt.Printf("   → 脱敏（%d 条）\n", len(a.Masks))
+		fmt.Printf("   -> 脱敏（%d 条）\n", len(a.Masks))
 		return c.active.MaskText(a.Masks)
 
 	case scenarios.ActionSleepWait:
-		fmt.Printf("   → 等待 %d ms\n", a.Ms)
+		fmt.Printf("   -> 等待 %d ms\n", a.Ms)
 		time.Sleep(time.Duration(a.Ms) * time.Millisecond)
 		return nil
 
 	case scenarios.ActionScrollTo:
-		fmt.Printf("   → 滚动到: %s\n", a.Selector)
+		fmt.Printf("   -> 滚动到: %s\n", a.Selector)
 		return c.active.ScrollIntoView(a.Selector)
 
 	case scenarios.ActionHoverText:
-		fmt.Printf("   → 悬停: %s\n", a.Text)
+		fmt.Printf("   -> 悬停: %s\n", a.Text)
 		return c.active.Hover(a.Text)
 
 	default:
@@ -153,7 +163,7 @@ func (c *runContext) dispatch(a scenarios.Action) error {
 func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error {
 	// lo.Ternary: InPopup=false 时用 Text，否则用 Selector 作为日志标识
 	label := lo.Ternary(a.Text != "", a.Text, a.Selector)
-	fmt.Printf("   → 点击: %s\n", label)
+	fmt.Printf("   -> 点击: %s\n", label)
 
 	if !a.InPopup {
 		err := clickFn()
@@ -167,7 +177,7 @@ func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error
 	popup, err := c.main.WaitForPopup(clickFn)
 	if err != nil {
 		if a.Type == scenarios.ActionClickSelector {
-			fmt.Printf("   → 新 Tab 未弹出，继续当前窗口\n")
+			fmt.Printf("   -> 新 Tab 未弹出，继续当前窗口\n")
 			return nil
 		}
 		return fmt.Errorf("等待弹窗失败: %w", err)
@@ -176,23 +186,19 @@ func (c *runContext) handleClick(a scenarios.Action, clickFn func() error) error
 	return nil
 }
 
-// handleSubmit 点击提交按钮 → 等待 Toast → 可选等待后置选择器
+// handleSubmit 点击提交按钮并等待后置响应
 func (c *runContext) handleSubmit(a scenarios.Action) error {
-	fmt.Printf("   → 提交: 点击 %q\n", a.Text)
+	fmt.Printf("   -> 提交: 点击 %q\n", a.Text)
 	if err := c.active.ClickText(a.Text); err != nil {
 		return err
 	}
 	_ = c.active.WaitToast(5 * time.Second)
 
 	if a.WaitSelector != "" {
-		fmt.Printf("   → 等待结果: %s\n", a.WaitSelector)
+		fmt.Printf("   -> 等待结果: %s\n", a.WaitSelector)
 		if err := c.active.WaitVisible(a.WaitSelector); err != nil {
-			fmt.Printf("   ⚠️  后置选择器 %q 未出现（继续）\n", a.WaitSelector)
+			fmt.Printf("   [warn] 等待元素未出现: %q\n", a.WaitSelector)
 		}
 	}
 	return nil
 }
-
-// ── 工具函数 ───────────────────────────────────────────────────────────────
-
-func divider() string { return strings.Repeat("─", 56) }
