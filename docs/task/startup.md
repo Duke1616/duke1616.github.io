@@ -461,8 +461,8 @@ compensator:
 
 :::
 
-::: tip Ansible 凭据与免密互信独立指南
-关于 Ansible 驱动的凭据安全隔离、受控端 SSH 免密授权与 Playbook 资产清单引用实战，已剥离为专项文档，详见：[Ansible 凭据与受控端互信](/task/ansible-credential)。
+::: tip Ansible 剧本编排与免密互信独立指南
+关于 Ansible 驱动的凭据安全隔离、受控端 SSH 免密授权与 Playbook 资产清单引用实战，已剥离为专项文档，详见：[Ansible 剧本编排](/task/runner/ansible)。
 :::
 
 ---

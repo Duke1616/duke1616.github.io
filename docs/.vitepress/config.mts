@@ -137,8 +137,17 @@ export default withMermaid(defineConfig({
           { text: '代码制品与模版', link: '/task/template' },
           { text: '环境变量与凭据', link: '/task/variable' },
           { text: '执行单元与调度路由', link: '/task/execution' },
-          { text: '异构执行引擎与 SDK', link: '/task/engine' },
-          { text: 'Ansible 凭据与互信', link: '/task/ansible-credential' },
+          { text: '异构执行引擎概览', link: '/task/engine' },
+          {
+            text: '执行引擎与运行时',
+            collapsed: false,
+            items: [
+              { text: 'Shell 脚本执行', link: '/task/runner/shell' },
+              { text: 'Python 脚本执行', link: '/task/runner/python' },
+              { text: 'Ansible 剧本编排', link: '/task/runner/ansible' },
+              { text: '自定义执行器开发 (SDK)', link: '/task/runner/custom' }
+            ]
+          },
           { text: '运行模式与配置实战', link: '/task/startup' }
         ]
       }
