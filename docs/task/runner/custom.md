@@ -3,23 +3,26 @@
 除了原生内置的 Shell、Python 与 Ansible 引擎外，ETask 提供了官方开放的 **`sdk/executor`**。开发者只需实现标准的 `TaskHandler` 接口，即可将企业私有运维逻辑（如 Terraform、Prometheus 告警演练、Kubernetes Job 等）以微服务形式无缝接入调度集群。
 
 ```mermaid
-flowchart LR
-    subgraph Developer ["开发者业务实现"]
-        Handler["TaskHandler 契约<br/>Metadata() / Run()"]
+flowchart TD
+    subgraph DevSpace ["业务定义与入参契约"]
+        Metadata["表单元数据契约<br/>(Metadata 动态表单)"]
+        Logic["自定义 TaskHandler<br/>(Run 核心业务逻辑)"]
+        Scheduler["调度中心任务入参<br/>(动态上下文派发)"]
     end
 
-    subgraph NodeRuntime ["gRPC 节点运行时"]
-        Node["sdk/executor/node 服务<br/>(PUSH 直推 / PULL 长轮询)"]
+    subgraph Sandbox ["执行器微服务节点运行时"]
+        Runner["Node 托管执行引擎<br/>(sdk/executor/node 守护)"]
     end
 
-    subgraph Center ["调度控制面"]
-        Console["Web 控制台<br/>(按 Metadata 动态渲染表单)"]
-        Scheduler["调度中心<br/>(派发入参 & 接收业务结果)"]
+    subgraph Outputs ["双向联动与状态消费"]
+        WebConsole["Web 控制台<br/>(动态渲染表单视图)"]
+        Center["调度中心状态流<br/>(心跳保活与结果回传)"]
     end
 
-    Handler --> Node
-    Node <-->|"心跳与调度"| Scheduler
-    Handler -.->|"元数据上报"| Console
+    Metadata & Logic -->|"接口注册装载"| Runner
+    Scheduler -->|"gRPC 派发任务"| Runner
+    Runner -->|"同步表单结构"| WebConsole
+    Runner -->|"回传进度与指标"| Center
 ```
 
 ---

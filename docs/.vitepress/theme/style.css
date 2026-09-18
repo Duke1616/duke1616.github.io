@@ -224,3 +224,33 @@ html.dark .VPHero .image {
     border-radius: 8px !important;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7) !important;
 }
+
+/* ===================================================
+   彻底修复 Mermaid 流程图节点文字高度遮挡/溢出问题
+   原因：VitePress 全局行高与字体大于 Mermaid 内部预估高度，
+   导致 foreignObject 内的多行文本底部被截断。
+   =================================================== */
+.mermaid foreignObject {
+    overflow: visible !important;
+}
+
+.mermaid foreignObject>div {
+    line-height: 1.35 !important;
+    font-size: 13.5px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0 4px !important;
+}
+
+.mermaid .node rect,
+.mermaid .node polygon,
+.mermaid .node circle {
+    overflow: visible !important;
+}
+
+.mermaid .node .label {
+    line-height: 1.35 !important;
+}

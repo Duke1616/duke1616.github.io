@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ETask 异构执行引擎体系架构</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #0b0f19;
+      color: #e6edf3;
+      width: 1120px;
+      height: 505px;
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1a2234;
+    }
+
+    .title-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f6fc;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title .icon {
+      color: #58a6ff;
+    }
+
+    .subtitle {
+      font-size: 11.5px;
+      color: #8b9bb4;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      color: #a371f7;
+      background: rgba(163, 113, 247, 0.12);
+      border: 1px solid rgba(163, 113, 247, 0.3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 架构主容器 */
+    .arch-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    /* 面板通用：保证 01、02、03 标题和内容绝对对齐，消除多余空白 */
+    .panel {
+      border-radius: 8px;
+      padding: 9px 13px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+      border: 1px solid #1e2638;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .panel.ingestion-panel {
+      border-color: rgba(56, 139, 253, 0.32);
+      background: linear-gradient(180deg, rgba(56, 139, 253, 0.05) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    .panel.engine-panel {
+      border-color: rgba(163, 113, 247, 0.32);
+      background: linear-gradient(180deg, rgba(163, 113, 247, 0.06) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    .panel.sandbox-panel {
+      border-color: rgba(63, 185, 80, 0.3);
+      background: linear-gradient(180deg, rgba(63, 185, 80, 0.05) 0%, rgba(14, 19, 30, 0.95) 100%);
+    }
+
+    /* 阶段标题栏 */
+    .section-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-title.blue { color: #58a6ff; }
+    .section-title.purple { color: #bc8cff; }
+    .section-title.green { color: #3fb950; }
+
+    .section-sub {
+      font-size: 10.5px;
+      color: #7d8b9f;
+    }
+
+    /* 01. 契约输入与制品物化网格 */
+    .grid-3-ingestion {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr 0.9fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .sub-card {
+      background: #101522;
+      border: 1px solid #1e2638;
+      border-radius: 6px;
+      padding: 7px 11px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .sub-card.blue { border-top: 2px solid #58a6ff; }
+    .sub-card.purple { border-top: 2px solid #bc8cff; }
+    .sub-card.cyan { border-top: 2px solid #39c5bb; }
+
+    .sub-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #1a2234;
+    }
+
+    .sub-card-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .sub-badge {
+      font-size: 9.5px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .sub-badge.blue { color: #58a6ff; background: rgba(56, 166, 255, 0.12); }
+    .sub-badge.purple { color: #bc8cff; background: rgba(188, 140, 255, 0.12); }
+    .sub-badge.cyan { color: #39c5bb; background: rgba(57, 197, 187, 0.12); }
+
+    .sub-card-desc {
+      font-size: 10.5px;
+      color: #8b9bb4;
+      line-height: 1.4;
+    }
+
+    /* 02. 四大引擎网格 */
+    .grid-4-engines {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .engine-card {
+      background: #101522;
+      border: 1px solid #1e2638;
+      border-radius: 6px;
+      padding: 9px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .engine-card.shell {
+      border-top: 3px solid #58a6ff;
+      box-shadow: 0 -2px 10px rgba(56, 166, 255, 0.15);
+    }
+
+    .engine-card.python {
+      border-top: 3px solid #3fb950;
+      box-shadow: 0 -2px 10px rgba(63, 185, 80, 0.15);
+    }
+
+    .engine-card.ansible {
+      border-top: 3px solid #f0883e;
+      box-shadow: 0 -2px 10px rgba(240, 136, 62, 0.15);
+    }
+
+    .engine-card.custom {
+      border-top: 3px solid #a371f7;
+      box-shadow: 0 -2px 10px rgba(163, 113, 247, 0.15);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #1a2234;
+    }
+
+    .card-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .engine-pill {
+      font-size: 9.5px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .engine-pill.blue { color: #58a6ff; background: rgba(56, 166, 255, 0.12); }
+    .engine-pill.green { color: #3fb950; background: rgba(63, 185, 80, 0.12); }
+    .engine-pill.orange { color: #f0883e; background: rgba(240, 136, 62, 0.12); }
+    .engine-pill.purple { color: #bc8cff; background: rgba(188, 140, 255, 0.12); }
+
+    .engine-focus {
+      font-size: 10.5px;
+      color: #8b9bb4;
+      line-height: 1.4;
+      margin-bottom: 7px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .mini-tag {
+      font-size: 9.5px;
+      padding: 1px 5px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      color: #c9d1d9;
+    }
+
+    /* 03. 四大沙箱网格 */
+    .grid-4-pillars {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .pillar-card {
+      background: #101522;
+      border: 1px solid #1e2638;
+      border-radius: 6px;
+      padding: 7px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .pillar-head {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pillar-icon {
+      font-size: 12px;
+    }
+
+    .pillar-desc {
+      font-size: 10px;
+      color: #8b9bb4;
+      line-height: 1.35;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 顶部标题栏 -->
+  <div class="header">
+    <div class="title-left">
+      <div class="title">
+        <span class="icon">⚙️</span>
+        ETask 异构执行引擎体系架构
+      </div>
+      <div class="subtitle">统一执行契约 · 源码与依赖制品装配 · 异构驱动插件矩阵 · 操作系统级四大沙箱支柱</div>
+    </div>
+    <div class="header-badge">ENGINE ARCHITECTURE</div>
+  </div>
+
+  <!-- 主架构层级容器 -->
+  <div class="arch-container">
+
+    <!-- 01. 统一输入与制品装配 -->
+    <div class="panel ingestion-panel">
+      <div class="section-bar">
+        <div class="section-title blue">
+          <span>01. 统一契约输入与制品装配</span>
+        </div>
+        <div class="section-sub">任务参数强类型绑定 · 项目源码与依赖制品解压 · 屏蔽上游协议差异</div>
+      </div>
+      <div class="grid-3-ingestion">
+        <!-- 载荷契约 -->
+        <div class="sub-card blue">
+          <div class="sub-card-head">
+            <span class="sub-card-title">任务参数与变量绑定</span>
+            <span class="sub-badge blue">参数解析</span>
+          </div>
+          <div class="sub-card-desc">
+            接收任务请求载荷，将输入参数、环境变量与凭据引用统一绑定至标准的执行上下文。
+          </div>
+        </div>
+
+        <!-- 制品装配 -->
+        <div class="sub-card purple">
+          <div class="sub-card-head">
+            <span class="sub-card-title">源码与依赖制品物化</span>
+            <span class="sub-badge purple">制品物化</span>
+          </div>
+          <div class="sub-card-desc">
+            拉取不可变项目工程源码解压至根目录，将系统公共层与租户私有依赖包挂载至工作区。
+          </div>
+        </div>
+
+        <!-- 引擎分派 -->
+        <div class="sub-card cyan">
+          <div class="sub-card-head">
+            <span class="sub-card-title">动态引擎路由分派</span>
+            <span class="sub-badge cyan">路由分发</span>
+          </div>
+          <div class="sub-card-desc">
+            结合物化就绪的工作区环境，将执行上下文自动分发至对应的语言执行驱动。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02. 异构驱动插件矩阵 (紧凑连接，杜绝空白断层) -->
+    <div class="panel engine-panel">
+      <div class="section-bar">
+        <div class="section-title purple">
+          <span>02. 异构驱动插件矩阵</span>
+        </div>
+        <div class="section-sub">支持单文件、项目级运行 · 统一执行契约驱动</div>
+      </div>
+      <div class="grid-4-engines">
+        <!-- Shell -->
+        <div class="engine-card shell">
+          <div>
+            <div class="card-top">
+              <span class="card-name">Shell 驱动</span>
+              <span class="engine-pill blue">原生子进程</span>
+            </div>
+            <div class="engine-focus">原生快速系统调用，开箱即用，零额外资源开销。</div>
+          </div>
+          <div class="tag-row">
+            <span class="mini-tag">单文件运行</span>
+            <span class="mini-tag">项目级运行</span>
+          </div>
+        </div>
+
+        <!-- Python -->
+        <div class="engine-card python">
+          <div>
+            <div class="card-top">
+              <span class="card-name">Python 驱动</span>
+              <span class="engine-pill green">实时流式</span>
+            </div>
+            <div class="engine-focus">实时无缓冲流式日志，自动装配系统与租户依赖包。</div>
+          </div>
+          <div class="tag-row">
+            <span class="mini-tag">单文件运行</span>
+            <span class="mini-tag">项目级运行</span>
+          </div>
+        </div>
+
+        <!-- Ansible -->
+        <div class="engine-card ansible">
+          <div>
+            <div class="card-top">
+              <span class="card-name">Ansible 驱动</span>
+              <span class="engine-pill orange">批量编排</span>
+            </div>
+            <div class="engine-focus">大规模受控主机批量编排，SSH 凭据物理隔离注入。</div>
+          </div>
+          <div class="tag-row">
+            <span class="mini-tag">仅支持项目级运行</span>
+          </div>
+        </div>
+
+        <!-- 自定义 SDK -->
+        <div class="engine-card custom">
+          <div>
+            <div class="card-top">
+              <span class="card-name">自定义 SDK</span>
+              <span class="engine-pill purple">常驻进程</span>
+            </div>
+            <div class="engine-focus">纯 Go 编写常驻进程，参数元数据随心跳租约自动上报。</div>
+          </div>
+          <div class="tag-row">
+            <span class="mini-tag">运行形态自行控制</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03. 底层四大运行时沙箱支柱 -->
+    <div class="panel sandbox-panel">
+      <div class="section-bar">
+        <div class="section-title green">
+          <span>03. 底层四大运行时沙箱支柱</span>
+        </div>
+        <div class="section-sub">操作系统底层防护 · 凭证零泄露 · 进程树级联治理 · 数据流物理解耦</div>
+      </div>
+      <div class="grid-4-pillars">
+        <!-- 支柱 1 -->
+        <div class="pillar-card">
+          <div class="pillar-head">
+            <span class="pillar-icon">📁</span>
+            <span>独占工作区隔离</span>
+          </div>
+          <div class="pillar-desc">每次执行分配独立的临时工作目录，任务结束后底层自动清空擦除。</div>
+        </div>
+
+        <!-- 支柱 2 -->
+        <div class="pillar-card">
+          <div class="pillar-head">
+            <span class="pillar-icon">🔒</span>
+            <span>0600 凭据物理沙箱</span>
+          </div>
+          <div class="pillar-desc">参数与变量仅写入 0600 权限临时文件，杜绝命令行泄露敏感凭据。</div>
+        </div>
+
+        <!-- 支柱 3 -->
+        <div class="pillar-card">
+          <div class="pillar-head">
+            <span class="pillar-icon">⚡</span>
+            <span>进程组级联强杀</span>
+          </div>
+          <div class="pillar-desc">子进程配置独立进程组，超时或取消时直接广播强杀整组，根除孤儿进程。</div>
+        </div>
+
+        <!-- 支柱 4 -->
+        <div class="pillar-card">
+          <div class="pillar-head">
+            <span class="pillar-icon">📦</span>
+            <span>结果独立管道</span>
+          </div>
+          <div class="pillar-desc">开启专用文件描述符 3 回传键值结果，与普通终端文本日志彻底物理隔离。</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

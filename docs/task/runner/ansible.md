@@ -1,37 +1,35 @@
 # Ansible 剧本编排
 
-ETask 原生深度集成了 Ansible 自动化运维能力。核心设计原则是**代码与认证材料物理隔离**：Playbook 仓库中绝不硬编码私钥或密码，仅声明凭据别名（如 `production-linux`），并在执行瞬间由节点沙箱动态注入。
+ETask 原生深度集成了 Ansible 自动化运维能力。核心设计原则是 **代码与认证材料物理隔离**：Playbook 仓库中绝不硬编码私钥或密码，仅声明凭据别名（如 `production-linux`），并在执行瞬间由节点沙箱动态注入。
 
 ```mermaid
-flowchart LR
-    subgraph Project ["Playbook 代码工程"]
-        Playbook["site.yml 主剧本"]
-        Inv["hosts.yml 资产清单<br/>(仅绑定凭据别名 ref)"]
+flowchart TD
+    subgraph Assets ["项目源码与安全凭据"]
+        Playbook["Playbook 代码工程<br/>(site.yml 声明任务)"]
+        Inventory["主机资产清单<br/>(hosts.yml 绑定别名)"]
+        Vault["宿主凭据安全库<br/>(0700 私钥与口令)"]
     end
 
-    subgraph HostCred ["宿主凭据安全库 (0700/0600)"]
-        Key["私钥 / 口令文件<br/>(运行瞬间动态装配)"]
+    subgraph Sandbox ["Ansible 沙箱执行环境"]
+        Runner["ansible-playbook 运行时<br/>(沙箱装配与滚动灰度)"]
     end
 
-    subgraph Sandbox ["独占沙箱工作区"]
-        Ansible["ansible-playbook 进程<br/>(ANSIBLE_HOME 动态重定向)"]
+    subgraph Targets ["受控目标与执行结果"]
+        Cluster["目标主机集群<br/>(严格 SSH 验签通信)"]
+        Report["执行结果与日志<br/>(主机变更状态聚合)"]
     end
 
-    subgraph Targets ["受控目标主机集群"]
-        NodeA["受控节点 A<br/>(authorized_keys 验签)"]
-        NodeB["受控节点 B<br/>(authorized_keys 验签)"]
-    end
-
-    Project --> Sandbox
-    HostCred -.->|"安全装配"| Sandbox
-    Sandbox -->|"严格 SSH 验签通信"| Targets
+    Playbook & Inventory -->|"源码物化装载"| Runner
+    Vault -->|"安全装配动态解密"| Runner
+    Runner -->|"滚动推送下发"| Cluster
+    Runner -->|"收集任务指标"| Report
 ```
 
 ---
 
 ## 1. 快速上手（最小工作模板）
 
-Ansible **仅支持以代码工程项目（Project）形态交付**，必须包含入口剧本文件（如 `site.yml`）与主机清单：
+Ansible **仅支持项目级执行**，必须包含入口剧本文件（如 `site.yml`）与主机清单：
 
 ::: code-group
 

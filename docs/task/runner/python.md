@@ -1,26 +1,28 @@
 # Python 脚本执行
 
-ETask 针对 Python 提供了定制化的执行沙箱。具备**无缓冲毫秒级流式日志（Unbuffered Output）**、**文件级参数反序列化**与**跨层制品自动装载（PYTHONPATH 自动追加）**能力。
+ETask 针对 Python 提供了定制化的执行沙箱。具备 **无缓冲毫秒级流式日志**、**文件级参数反序列化** 与 **跨层制品自动装载** 能力。
 
 ```mermaid
-flowchart LR
-    subgraph Mounts ["运行时环境装载"]
-        Art["跨层制品库<br/>(自动追加至 PYTHONPATH)"]
-        Args["入参文件 (0600)<br/>$ETASK_ARGS_FILE"]
+flowchart TD
+    subgraph Mounts ["跨层依赖与参数挂载"]
+        SysLib["系统公共库<br/>($ETASK_SYSTEM_ROOT)"]
+        TenantLib["租户依赖库<br/>($ETASK_DEPENDENCIES_ROOT)"]
+        Args["业务入参文件<br/>($ETASK_ARGS_FILE)"]
     end
 
-    subgraph Runtime ["Python 执行沙箱"]
-        Py["python3 子进程<br/>(强制 PYTHONUNBUFFERED=1)"]
+    subgraph Sandbox ["Python 沙箱执行环境"]
+        Runner["python3 运行时<br/>(无缓冲流式执行)"]
     end
 
-    subgraph Outputs ["双通道输出"]
-        Log["FD 1/2: 终端流式日志<br/>(无缓冲输出，实时呈现)"]
-        Result["FD 3: 结构化返回值<br/>(内置 want_result 库回传)"]
+    subgraph Channels ["运行时双通道消费"]
+        Console["控制台实时日志<br/>(毫秒级无缓冲回显)"]
+        FD3["工作流上下文<br/>(want_result 结果回传)"]
     end
 
-    Mounts --> Py
-    Py --> Log
-    Py --> Result
+    SysLib & TenantLib -->|"自动追加 sys.path 首位"| Runner
+    Args -->|"json.load 安全解析"| Runner
+    Runner -->|"标准流输出"| Console
+    Runner -->|"专用通道写入"| FD3
 ```
 
 ---

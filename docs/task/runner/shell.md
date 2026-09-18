@@ -1,26 +1,28 @@
 # Shell 脚本执行
 
-ETask 原生支持 POSIX Shell（Bash）脚本执行，内置**独立进程组强杀**、**文件级参数沙箱**、**结构化结果管道（FD 3）**与**公共制品库跨层复用**能力。
+ETask 原生支持 POSIX Shell（Bash）脚本执行，内置 **独立进程组强杀**、**文件级参数沙箱**、**结构化结果管道（FD 3）** 与 **公共制品库跨层复用** 能力。
 
 ```mermaid
-flowchart LR
-    subgraph Inputs ["标准输入契约"]
-        Args["入参文件 (0600)<br/>$ETASK_ARGS_FILE"]
-        Env["环境脚本 (0600)<br/>$ETASK_SHELL_ENV_FILE"]
+flowchart TD
+    subgraph Inputs ["环境注入与参数输入"]
+        Env["环境配置脚本<br/>($ETASK_SHELL_ENV_FILE)"]
+        Args["业务入参文件<br/>($ETASK_ARGS_FILE)"]
+        Sys["系统制品工具库<br/>($ETASK_SYSTEM_ROOT)"]
     end
 
-    subgraph Sandbox ["沙箱工作区 (Setpgid: true)"]
-        Bash["/bin/bash 子进程组<br/>(独立 -PID 级联强杀)"]
+    subgraph Sandbox ["Shell 沙箱执行环境"]
+        Runner["/bin/bash 进程组<br/>(独立 -PID 级联强杀)"]
     end
 
-    subgraph Outputs ["双通道输出"]
-        Log["FD 1/2: 终端流式日志<br/>(本地正则脱敏过滤)"]
-        Result["FD 3: 结构化返回值<br/>(内置 want_result 库回传)"]
+    subgraph Outputs ["双通道输出与消费"]
+        Console["终端流式日志<br/>(FD 1/2 本地脱敏回显)"]
+        FD3["工作流上下文<br/>(FD 3 want_result 回传)"]
     end
 
-    Inputs --> Bash
-    Bash --> Log
-    Bash --> Result
+    Env & Sys -->|"source 引入加载"| Runner
+    Args -->|"jq 安全提取解析"| Runner
+    Runner -->|"标准流捕获"| Console
+    Runner -->|"专用管道写入"| FD3
 ```
 
 ---
