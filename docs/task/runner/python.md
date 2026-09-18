@@ -27,104 +27,47 @@ flowchart LR
 
 ## 1. 快速上手（最小工作模板）
 
-以下为满足 ETask 生产规范的标准 Python 脚本模板，包含类型提示、毫秒级流式日志、入参防御性解析与官方结果回传：
+以下为满足 ETask 规范的轻量 Python 脚本模板，包含入参解析、业务处理与官方结果回传：
 
 ```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-ETask 生产级 Python 作业脚本模板
-特性：类型注解完备、结构化流式日志、沙箱入参安全反序列化与 FD 3 结果通道回传
-"""
 
 import json
-import logging
 import os
 import sys
-import time
-from typing import Any, Dict
 
-# 1. 配置毫秒级无缓冲流式日志 (结合 PYTHONUNBUFFERED=1 实时呈现)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
-)
-logger = logging.getLogger("etask.job")
-
-# 2. 跨层依赖导入：系统公共库结果回传工具
+# 1. 引入系统内置结果回传工具
 try:
     from etask.third_party.base.want_result import want_result
 except ImportError:
     want_result = None
 
+def main():
+    # 2. 从入参文件安全解析动态入参 (0600 只读 JSON)
+    args = {}
+    args_file = os.environ.get("ETASK_ARGS_FILE")
+    if args_file and os.path.exists(args_file):
+        with open(args_file, "r", encoding="utf-8") as f:
+            args = json.load(f)
 
-def load_task_args() -> Dict[str, Any]:
-    """从沙箱环境安全反序列化入参文件 (0600 只读 JSON)"""
-    args_path = os.environ.get("ETASK_ARGS_FILE")
-    if not args_path or not os.path.exists(args_path):
-        logger.warning("未检测到入参文件 $ETASK_ARGS_FILE，采用默认空配置")
-        return {}
-
-    try:
-        with open(args_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as err:
-        logger.error(f"解析入参文件失败 [{args_path}]: {err}")
-        raise
-
-
-def report_results(metrics: Dict[str, Any]) -> None:
-    """向专有通道 (FD 3) 回传结构化业务结果，供下游工作流分支判定"""
-    for key, value in metrics.items():
-        if want_result:
-            want_result(key, value)
-        else:
-            logger.debug(f"[本地调试模拟] 回传指标 -> {key}: {value}")
-
-
-def main() -> None:
-    # 3. 加载并校验业务动态入参
-    args = load_task_args()
     target_env = args.get("env", "staging")
-    batch_size = int(args.get("batch_size", 50))
+    print(f"开始执行任务，目标环境: {target_env}")
 
-    logger.info(f"作业启动，目标环境: {target_env}，批次大小: {batch_size}")
+    # 3. 执行核心业务逻辑
+    success_count = 10
+    status = "SUCCESS"
 
-    # 4. 执行核心业务逻辑
-    start_time = time.time()
-    success_count = batch_size
-    failed_count = 0
+    # 4. 回传结构化指标供下游工作流使用 (FD 3)
+    if want_result:
+        want_result("env", target_env)
+        want_result("success_count", success_count)
+        want_result("status", status)
 
-    # 模拟业务操作耗时
-    time.sleep(0.3)
-
-    duration_sec = round(time.time() - start_time, 2)
-    logger.info(f"作业执行完毕，耗时: {duration_sec}s, 成功: {success_count}, 失败: {failed_count}")
-
-    # 5. 回传结构化业务指标
-    report_results({
-        "env": target_env,
-        "success_count": success_count,
-        "failed_count": failed_count,
-        "duration_sec": duration_sec,
-        "status": "SUCCESS" if failed_count == 0 else "FAILED",
-    })
-
-    if failed_count > 0:
-        logger.error(f"存在业务失败条目 ({failed_count})，非零退出")
-        sys.exit(1)
-
-    sys.exit(0)
-
+    print(f"任务执行完成: status={status}, count={success_count}")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as exc:
-        logger.critical(f"未捕获的全局异常: {exc}", exc_info=True)
-        sys.exit(1)
+    main()
 ```
 
 ---
