@@ -144,67 +144,14 @@ flowchart LR
 
 ---
 
-## 5. 脚本标准接入与消费范式
+## 5. 各运行时接入与消费指引
 
-### 5.1 Shell 脚本读取范式
+各类语言在独占沙箱中读取环境变量、解析入参文件以及回传指标的完整模板与最佳实践，请直接参阅对应的执行引擎文档：
 
-在 Shell 脚本中，有效变量已直接注入子进程环境，可直接读取；入参通过 `$ETASK_ARGS_FILE` 安全解析：
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# 1. 引入系统内置结果回传工具
-[[ -f "${ETASK_SYSTEM_ROOT:-}/third_party/utils/want_result.sh" ]] && source "$ETASK_SYSTEM_ROOT/third_party/utils/want_result.sh"
-
-# 2. 读取业务入参：从 ETASK_ARGS_FILE 读取 JSON 载荷
-args=$(<"$ETASK_ARGS_FILE")
-echo "接收到任务业务入参: $args"
-
-# 3. 读取环境变量：直接使用子进程环境变量（或 source "$ETASK_SHELL_ENV_FILE"）
-echo "目标主机地址: ${TARGET_HOST:-"127.0.0.1"}"
-echo "当前工作区路径: ${ETASK_WORKSPACE_ROOT}"
-
-# 4. 回传业务结果供下游消费 (FD 3)
-want_result "status" "SUCCESS"
-```
-
-### 5.2 Python 脚本读取范式
-
-Python 脚本通过标准库直接解析受控文件中的参数与变量：
-
-```python
-#!/usr/bin/env python3
-import json
-import os
-
-# 1. 引入系统内置结果回传工具
-try:
-    from etask.third_party.base.want_result import want_result
-except ImportError:
-    want_result = None
-
-def main():
-    # 2. 解析任务业务入参 (JSON 对象)
-    with open(os.environ["ETASK_ARGS_FILE"], encoding="utf-8") as f:
-        args = json.load(f)
-    print("业务入参:", args)
-
-    # 3. 解析结构化环境变量 (Key-Value 列表)
-    with open(os.environ["ETASK_VARIABLES_FILE"], encoding="utf-8") as f:
-        variables = {item["key"]: item["value"] for item in json.load(f)}
-    print("目标数据库:", variables.get("DB_HOST", "localhost"))
-
-    # 4. 读取独立沙箱工作区与项目路径
-    print("工作区路径:", os.environ.get("ETASK_WORKSPACE_ROOT"))
-    print("项目根目录:", os.environ.get("ETASK_PROJECT_ROOT"))
-
-    # 5. 回传业务结果供下游消费 (FD 3)
-    if want_result:
-        want_result("status", "SUCCESS")
-        want_result("db_host", variables.get("DB_HOST", "localhost"))
-
-if __name__ == "__main__":
-    main()
-```
+| 执行引擎 | 核心变量消费与运行时机制 | 详细参考 |
+| :--- | :--- | :--- |
+| **Shell** | 环境变量自动注入子进程、`0600` 入参文件提取、`want_result.sh` 结果回传 | [Shell 脚本执行](/task/runner/shell) |
+| **Python** | 自动追加 `PYTHONPATH`、`0600` 入参 JSON 反序列化、`want_result` SDK 调用 | [Python 脚本执行](/task/runner/python) |
+| **Ansible** | 宿主凭据安全库隔离、`etask_credential_ref` 别名装配、Playbook 滚动编排 | [Ansible 剧本编排](/task/runner/ansible) |
+| **自定义 SDK** | `executor.Context` 读取参数、上报流式日志与进度、写入结构化结果 | [自定义执行器开发](/task/runner/custom) |
 

@@ -75,13 +75,6 @@ ETask 摒弃了命令行位置传参（杜绝 `ps` 进程泄露敏感参数）�
 | **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：平台预置系统组件挂载根目录（包含 `third_party/utils/want_result.sh`） |
 | **`$ETASK_DEPENDENCIES_ROOT`** | 只读目录 | **租户依赖制品库**：当前租户具名依赖制品库的聚合挂载根目录 |
 
-::: tip 无 jq 环境读取入参
-若极简目标镜像未安装 `jq` 工具，可借助系统内置的 Python 单行提取：
-```bash
-TARGET_HOST=$(python3 -c "import json, os; print(json.load(open(os.environ['ETASK_ARGS_FILE'])).get('host', ''))")
-```
-:::
-
 ---
 
 ## 3. 结构化结果回传通道（FD 3 与 want_result）
