@@ -82,6 +82,8 @@ ETask 采用统一的文件沙箱传递参数，杜绝命令行参数注入攻�
 | **`$ETASK_VARIABLES_FILE`** | `0600` (只读) | **环境变量与凭据**：Runner 解密注入的敏感配置映射，在代码中不硬编码凭据 |
 | **`PYTHONUNBUFFERED=1`** | 自动注入 | **日志无缓冲**：强制关闭标准输出缓冲区，确保 `print()` 毫秒级流式呈现在控制台 |
 | **`$ETASK_WORKSPACE_ROOT`** | 独占目录 | **沙箱工作区**：任务私有临时目录，任务结束自动物理清理 |
+| **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：平台预置系统组件挂载根目录 |
+| **`$ETASK_DEPENDENCIES_ROOT`** | 只读目录 | **租户依赖制品库**：当前租户具名依赖制品库的聚合挂载根目录 |
 
 ---
 
@@ -91,7 +93,7 @@ ETask 采用统一的文件沙箱传递参数，杜绝命令行参数注入攻�
 
 ```python
 # 执行节点拉起 python3 时，已将系统制品与租户制品自动注入 sys.path 首位:
-# PYTHONPATH="$ETASK_SYSTEM_ROOT:$ETASK_ARTIFACT_ROOT:$PYTHONPATH"
+# PYTHONPATH="$ETASK_SYSTEM_ROOT:$ETASK_DEPENDENCIES_ROOT:$PYTHONPATH"
 ```
 
 ### 开箱即用的模块导入

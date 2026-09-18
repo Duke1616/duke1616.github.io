@@ -18,7 +18,7 @@
 | **`ETASK_PROJECT_ROOT`** | 项目工程代码 | 当前项目的只读挂载根目录，也是脚本执行的默认工作目录。 |
 | **`ETASK_SYSTEM_ROOT`** | 包含系统级制品 | 系统公共基础制品的只读挂载根目录。 |
 | **`ETASK_DEPENDENCIES_ROOT`** | 包含租户级制品 | 当前租户具名依赖制品库的聚合挂载根目录。 |
-| **`EWORK_RESULT_FD`** | 始终提供 | 结构化执行结果回传的文件描述符（固定为 `3`），供结果提取器读取。 |
+| **`EWORK_RESULT_FD`** | 始终提供 | 结构化结果回传的文件描述符（固定为 `3`）。系统内置提供了 `want_result` 工具库（详见 [Shell](/task/runner/shell) 与 [Python](/task/runner/python)）封装此通道。 |
 | **`FORCE_COLOR`** | 始终提供 | 固定为 `1`，指示子进程命令保留终端色彩输出。 |
 | **`TERM`** | 始终提供 | 固定为 `xterm-256color`，提供标准的终端模拟环境。 |
 
@@ -151,16 +151,22 @@ flowchart LR
 在 Shell 脚本中，有效变量已直接注入子进程环境，可直接读取；入参通过 `$ETASK_ARGS_FILE` 安全解析：
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# 1. 读取业务入参：从 ETASK_ARGS_FILE 读取 JSON 载荷
+# 1. 引入系统内置结果回传工具
+[[ -f "${ETASK_SYSTEM_ROOT:-}/third_party/utils/want_result.sh" ]] && source "$ETASK_SYSTEM_ROOT/third_party/utils/want_result.sh"
+
+# 2. 读取业务入参：从 ETASK_ARGS_FILE 读取 JSON 载荷
 args=$(<"$ETASK_ARGS_FILE")
 echo "接收到任务业务入参: $args"
 
-# 2. 读取环境变量：直接使用子进程环境变量（或 source "$ETASK_SHELL_ENV_FILE"）
+# 3. 读取环境变量：直接使用子进程环境变量（或 source "$ETASK_SHELL_ENV_FILE"）
 echo "目标主机地址: ${TARGET_HOST:-"127.0.0.1"}"
 echo "当前工作区路径: ${ETASK_WORKSPACE_ROOT}"
+
+# 4. 回传业务结果供下游消费 (FD 3)
+want_result "status" "SUCCESS"
 ```
 
 ### 5.2 Python 脚本读取范式
@@ -172,20 +178,31 @@ Python 脚本通过标准库直接解析受控文件中的参数与变量：
 import json
 import os
 
+# 1. 引入系统内置结果回传工具
+try:
+    from etask.third_party.base.want_result import want_result
+except ImportError:
+    want_result = None
+
 def main():
-    # 1. 解析任务业务入参 (JSON 对象)
+    # 2. 解析任务业务入参 (JSON 对象)
     with open(os.environ["ETASK_ARGS_FILE"], encoding="utf-8") as f:
         args = json.load(f)
     print("业务入参:", args)
 
-    # 2. 解析结构化环境变量 (Key-Value 列表)
+    # 3. 解析结构化环境变量 (Key-Value 列表)
     with open(os.environ["ETASK_VARIABLES_FILE"], encoding="utf-8") as f:
         variables = {item["key"]: item["value"] for item in json.load(f)}
     print("目标数据库:", variables.get("DB_HOST", "localhost"))
 
-    # 3. 读取独立沙箱工作区与项目路径
+    # 4. 读取独立沙箱工作区与项目路径
     print("工作区路径:", os.environ.get("ETASK_WORKSPACE_ROOT"))
     print("项目根目录:", os.environ.get("ETASK_PROJECT_ROOT"))
+
+    # 5. 回传业务结果供下游消费 (FD 3)
+    if want_result:
+        want_result("status", "SUCCESS")
+        want_result("db_host", variables.get("DB_HOST", "localhost"))
 
 if __name__ == "__main__":
     main()

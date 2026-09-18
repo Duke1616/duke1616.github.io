@@ -69,10 +69,11 @@ ETask 摒弃了命令行位置传参（杜绝 `ps` 进程泄露敏感参数）�
 | 变量 / 文件 | 访问权限 | 核心作用与使用方法 |
 | :--- | :--- | :--- |
 | **`$ETASK_ARGS_FILE`** | `0600` (只读) | **业务动态入参**：上游传递的 JSON 文件，推荐用 `jq -r '.key' "$ETASK_ARGS_FILE"` 提取 |
-| **`$ETASK_SHELL_ENV_FILE`** | `0600` (只读) | **环境加载脚本**：通过 `source "$ETASK_SHELL_ENV_FILE"` 快速加载环境变量与辅助函数 |
+| **`$ETASK_VARIABLES_FILE`** | `0600` (只读) | **环境变量映射**：合并解密后的有效环境变量 JSON 列表，无变量时为 `[]` |
+| **`$ETASK_SHELL_ENV_FILE`** | `0600` (只读) | **环境加载脚本**：格式化的环境变量文件，支持在脚本中通过 `source` 安全导入 |
 | **`$ETASK_WORKSPACE_ROOT`** | 独占目录 | **沙箱工作区**：任务私有临时目录，任务退出后物理清除，保持无状态 |
-| **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：引用平台预置的系统组件（随部署镜像提供，包含 `third_party/utils/want_result.sh`） |
-| **`$ETASK_ARTIFACT_ROOT`** | 只读目录 | **租户私有制品库**：引用租户自研的公共脚本依赖包 |
+| **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：平台预置系统组件挂载根目录（包含 `third_party/utils/want_result.sh`） |
+| **`$ETASK_DEPENDENCIES_ROOT`** | 只读目录 | **租户依赖制品库**：当前租户具名依赖制品库的聚合挂载根目录 |
 
 ::: tip 无 jq 环境读取入参
 若极简目标镜像未安装 `jq` 工具，可借助系统内置的 Python 单行提取：
