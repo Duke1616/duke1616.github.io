@@ -87,7 +87,7 @@ html.dark .VPHero .image {
     }
 }
 
-/* 移动端：首列冻结吸附（Sticky Column），滑动时字段对照始终可见 */
+/* 移动端：整表平滑横向滚动，取消首列冻结吸附，彻底解决窄屏下遮挡后续内容的问题 */
 @media (max-width: 768px) {
 
     .vp-table-wrap table th,
@@ -100,23 +100,11 @@ html.dark .VPHero .image {
 
     .vp-table-wrap table th:first-child,
     .vp-table-wrap table td:first-child {
-        position: sticky;
-        left: 0;
-        z-index: 2;
-        min-width: 96px;
-        max-width: 140px;
-        white-space: normal;
-        background-color: var(--vp-c-bg);
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .vp-table-wrap table tr:nth-child(2n) td:first-child {
-        background-color: var(--vp-c-bg-soft);
-    }
-
-    html.dark .vp-table-wrap table th:first-child,
-    html.dark .vp-table-wrap table td:first-child {
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.35);
+        position: static;
+        min-width: auto;
+        max-width: none;
+        box-shadow: none;
+        background-color: transparent;
     }
 }
 
