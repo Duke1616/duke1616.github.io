@@ -64,7 +64,7 @@ ETask 摒弃了命令行位置传参（杜绝 `ps` 进程泄露敏感参数）�
 | **`$ETASK_ARGS_FILE`** | `0600` (只读) | **业务动态入参**：上游传递的 JSON 文件，推荐用 `jq -r '.key' "$ETASK_ARGS_FILE"` 提取 |
 | **`$ETASK_SHELL_ENV_FILE`** | `0600` (只读) | **环境加载脚本**：通过 `source "$ETASK_SHELL_ENV_FILE"` 快速加载环境变量与辅助函数 |
 | **`$ETASK_WORKSPACE_ROOT`** | 独占目录 | **沙箱工作区**：任务私有临时目录，任务退出后物理清除，保持无状态 |
-| **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：引用平台内置的通用工具包（随 ETask 服务启动自动注入，包含 `third_party/utils/want_result.sh`） |
+| **`$ETASK_SYSTEM_ROOT`** | 只读目录 | **系统公共制品库**：引用平台预置的系统组件（随部署镜像提供，包含 `third_party/utils/want_result.sh`） |
 | **`$ETASK_ARTIFACT_ROOT`** | 只读目录 | **租户私有制品库**：引用租户自研的公共脚本依赖包 |
 
 ::: tip 无 jq 环境读取入参
@@ -82,7 +82,7 @@ TARGET_HOST=$(python3 -c "import json, os; print(json.load(open(os.environ['ETAS
 
 ### 3.1 官方推荐：使用系统内置 `want_result`
 
-系统制品库已在调度中心启动时自动注入了开箱即用的工具脚本，无需任何手动部署，直接引用即可：
+ETask 官方部署镜像已内置了该工具脚本，发布至系统制品库后即可在全生态任意任务中开箱即用：
 
 ```bash
 # 1. 引入工具库
